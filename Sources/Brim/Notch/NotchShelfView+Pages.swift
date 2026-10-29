@@ -9,13 +9,14 @@ extension NotchShelfView {
   /// takes its place while one leads or was picked. The full player lives on the Music page.
   var isShelfHome: Bool {
     guard page == .home, presentation.selectedActivity == nil || presentation.selectedActivity == .music
+        || presentation.selectedActivity?.isPassiveStatus == true
     else { return false }
     return Self.showsShelf(homeTapped: presentation.homeTapped, editing: homeWidgets.isEditing, primary: selectedActivity)
   }
 
   /// - Returns: true for the widget shelf, false for the leading activity's card.
   nonisolated static func showsShelf(homeTapped: Bool, editing: Bool, primary: IslandActivity?) -> Bool {
-    editing || homeTapped || primary == nil || primary == .music
+    editing || homeTapped || primary == nil || primary == .music || primary?.isPassiveStatus == true
   }
 
   /// The Music page: the full player, or the idle "Not playing" card when no track is known.

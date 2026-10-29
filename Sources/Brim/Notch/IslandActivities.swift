@@ -6,6 +6,9 @@ enum IslandActivity: String, CaseIterable {
     /// Quiet always-on indicators: camera or microphone in use, Focus on, Personal Hotspot connected.
     case privacy, dnd, hotspot
 
+    /// Quiet system state stays in the compact island; it has no expanded activity page.
+    var isPassiveStatus: Bool { self == .privacy || self == .dnd || self == .hotspot }
+
     var title: String {
         switch self {
         case .recording: return "Screen Recording"
