@@ -9,7 +9,7 @@
 Screenshots, a file tray, clipboard history, music and live activities,
 living in your Mac's notch.
 
-[![Download](https://img.shields.io/badge/download-v1.0.5-2f6bff?style=for-the-badge)](https://github.com/CezarProX/brim/releases/latest)
+[![Download](https://img.shields.io/badge/download-v1.0.6-2f6bff?style=for-the-badge)](https://github.com/CezarProX/brim/releases/latest)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-111111?style=for-the-badge&logo=apple&logoColor=white)](#requirements)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-2ea44f?style=for-the-badge)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-native-F05138?style=for-the-badge&logo=swift&logoColor=white)](#build-from-source)
@@ -131,7 +131,7 @@ until you move the pointer onto it and then away. New installs keep the island v
 
 ## Updates
 
-**Current release: [Brim 1.0.5](https://github.com/CezarProX/brim/releases/tag/v1.0.5).**
+**Current release: [Brim 1.0.6](https://github.com/CezarProX/brim/releases/tag/v1.0.6).**
 
 From 1.0.5, releases reuse the same publisher certificate and bundle identifier so macOS can
 recognize the app across updates. Moving from the older ad-hoc builds may require one final
@@ -149,7 +149,7 @@ available, click the green update arrow in the island, then choose **Install Upd
 update window. Brim downloads the update, replaces the app and relaunches; you keep your settings.
 You can also right-click the island’s navigation bar and choose **Check for Updates**.
 
-Users on 1.0.0 need to download and install the current release, **1.0.5**, once to get the updater. Future updates install
+Users on 1.0.0 need to download and install the current release, **1.0.6**, once to get the updater. Future updates install
 from the app. Publishing a signed GitHub release makes it available to installed copies; pushing
 source changes alone does not. See [Releasing](docs/RELEASING.md).
 
