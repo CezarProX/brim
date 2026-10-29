@@ -31,7 +31,12 @@ final class CommandCenterController: NSObject {
     pager.page = CommandCenterLayout.startPage(settings.commandCenterStartPage, lastUsed: settings.commandCenterLastPage,
                                                pageCount: store.pageCount)
     let root = CommandCenterView(store: store, pager: pager, onAction: { [weak self] in self?.handle($0) },
-                                 onClose: { [weak self] in self?.close() })
+                                 onClose: { [weak self] in self?.close() },
+                                 onOpenIsland: { [weak self] in
+                                   self?.close()
+                                   // Finish the originating click before pinning the island open.
+                                   DispatchQueue.main.async { NotchShelfController.shared.showIsland() }
+                                 })
     let host = NSHostingView(rootView: root)
     let size = CommandCenterView.size
     host.frame = CGRect(origin: .zero, size: size)

@@ -2754,3 +2754,10 @@
 "Pinned. Click to follow the latest session again." = "Pinned. Click to follow the latest session again.";
 "To use the YouTube Music queue, turn on Allow JavaScript from Apple Events in Chrome: View › Developer." = "To use the YouTube Music queue, turn on Allow JavaScript from Apple Events in Chrome: View › Developer.";
 "Couldn't restart Finder" = "Couldn't restart Finder";
+"Open Island" = "Open Island";
+"Install Update…" = "Install Update…";
+"Update to %@" = "Update to %@";
+"Checking for Updates…" = "Checking for Updates…";
+"Signed updates come from Brim’s GitHub Releases. Install and relaunch from the island without downloading the app again. Background checks never install updates automatically." = "Signed updates come from Brim’s GitHub Releases. Install and relaunch from the island without downloading the app again. Background checks never install updates automatically.";
+
+"Install a release build of Brim to use signed updates." = "Install a release build of Brim to use signed updates.";

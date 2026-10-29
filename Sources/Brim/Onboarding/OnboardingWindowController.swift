@@ -42,12 +42,24 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
   static let shared = OnboardingWindowController()
   private var window: NSWindow?
   private let flow = OnboardingFlow()
+  private let settings: AppSettings
+  private let revealIsland: () -> Void
+  private let startIslandTour: (TimeInterval) -> Void
+
+  init(settings: AppSettings = .shared,
+       revealIsland: (() -> Void)? = nil,
+       startIslandTour: ((TimeInterval) -> Void)? = nil) {
+    self.settings = settings
+    self.revealIsland = revealIsland ?? { NotchShelfController.shared.showIsland() }
+    self.startIslandTour = startIslandTour ?? { IslandTourController.shared.startIfNeeded(after: $0) }
+    super.init()
+  }
 
   /// First launch only: opens the tour until the user has finished or closed it once.
   func showIfNeeded() {
-    guard !AppSettings.shared.onboardingCompleted else {
+    guard !settings.onboardingCompleted else {
       // Saw the introduction before the Island Tour existed: offer the tour once, after launch settles.
-      IslandTourController.shared.startIfNeeded(after: IslandTourPolicy.launchDelay)
+      startIslandTour(IslandTourPolicy.launchDelay)
       return
     }
     show()
@@ -91,11 +103,14 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
   }
 
   private func finish() {
-    AppSettings.shared.onboardingCompleted = true
+    let firstLaunch = !settings.onboardingCompleted
+    settings.onboardingCompleted = true
     window?.orderOut(nil)
     window = nil
+    // Make the real island discoverable even if another app is fullscreen or no grants were given.
+    if firstLaunch && settings.notchShelfEnabled { revealIsland() }
     // The first time through, the introduction hands over to the Island Tour on the real island.
-    IslandTourController.shared.startIfNeeded(after: IslandTourPolicy.afterIntroductionDelay)
+    startIslandTour(IslandTourPolicy.afterIntroductionDelay)
   }
 }
 

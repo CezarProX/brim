@@ -17,6 +17,7 @@ struct CommandCenterView: View {
   var models: CommandCenterModels = CommandCenterModels()
   var onAction: (TileKind) -> Void = { _ in }
   var onClose: () -> Void = {}
+  var onOpenIsland: () -> Void = {}
   /// Off for renders, which capture a single frame.
   var animatesEntrance = true
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -65,6 +66,7 @@ struct CommandCenterView: View {
         Button("Done") { withAnimation(NotchMotion.layout(reduceMotion: reduceMotion)) { store.isEditing = false } }
           .buttonStyle(IslandPillStyle(prominent: true, tint: .blue, compact: true))
       } else {
+        CommandHeaderButton(symbol: "rectangle.topthird.inset.filled", label: L10n.tr("Open Island"), hoverEffect: .wiggle) { onOpenIsland() }
         CommandHeaderButton(symbol: "pencil", label: "Edit Command Center", hoverEffect: .wiggle) {
           withAnimation(NotchMotion.layout(reduceMotion: reduceMotion)) { store.isEditing = true }
         }

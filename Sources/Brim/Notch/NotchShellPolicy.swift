@@ -103,6 +103,7 @@ enum FullscreenDetector {
                 && abs(window.bounds.width - display.width) <= 1
                 && abs(window.bounds.maxY - display.maxY) <= 1
                 && abs(window.bounds.midX - display.midX) <= 1
+                && window.bounds.minY >= display.minY - 1
                 && window.bounds.minY - display.minY <= slack
         }
     }

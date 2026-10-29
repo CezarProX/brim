@@ -152,6 +152,17 @@ struct FullscreenDetectorTests {
                                               windows: [window(zoomed)], ignoringPID: 1))
     }
 
+    @Test func fullscreenWithAnAlwaysVisibleMenuBarStillCounts() {
+        #expect(FullscreenDetector.isCovered(display: display, notchHeight: 0, menuBarVisible: true,
+                                             windows: [window(display)], ignoringPID: 1))
+    }
+
+    @Test func windowExtendingAboveTheDisplayIsNotFullscreenOnIt() {
+        let spanning = CGRect(x: 0, y: -500, width: 1512, height: 1482)
+        #expect(!FullscreenDetector.isCovered(display: display, notchHeight: 33, menuBarVisible: false,
+                                              windows: [window(spanning)], ignoringPID: 1))
+    }
+
     @Test func notchedFullscreenBelowTheCameraCountsOnceTheMenuBarIsGone() {
         let belowNotch = CGRect(x: 0, y: 33, width: 1512, height: 949)
         #expect(FullscreenDetector.isCovered(display: display, notchHeight: 33, menuBarVisible: false,
@@ -361,7 +372,7 @@ struct ShellSettingsTests {
         // and the island stays up in Mission Control.
         #expect(s.shellExternalVisibility == .always && s.shellExternalStyle == .island)
         #expect(!s.shellHideInMissionControl)
-        #expect(s.shellHideOnFullscreen && !s.shellHideFromCapture && s.shellHiddenApps.isEmpty)
+        #expect(!s.shellHideOnFullscreen && !s.shellHideFromCapture && s.shellHiddenApps.isEmpty)
         #expect(ShellTiming.current(s) == ShellTiming())
         #expect(ShellTuning.current(s) == ShellTuning())
     }

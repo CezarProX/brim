@@ -19,6 +19,10 @@ if CommandLine.arguments.contains("--agent-hook") { AgentHook.runAndExit() }
 // the main thread) so the MainActor-isolated `AppDelegate` can be constructed
 // here without hopping through an async context.
 MainActor.assumeIsolated {
+    if CommandLine.arguments.contains("--island-smoke-test") {
+        IslandStartupDiagnostic.run(NSApplication.shared)
+        exit(0)
+    }
     // Data and preferences from builds made before the rename move over before anything reads them.
     LegacyMigration.run()
     let app = NSApplication.shared

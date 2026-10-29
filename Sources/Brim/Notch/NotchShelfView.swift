@@ -62,6 +62,7 @@ struct NotchShelfView: View {
   @ObservedObject var notifications: NotificationHUDModel = .shared
   @ObservedObject var glances: IslandGlanceModel = .shared
   @ObservedObject var theme: IslandTheme = .shared
+  @ObservedObject var updater: AppUpdater = .shared
   var weather: WeatherStore = .shared
   var playingNext: PlayingNextModel = .shared
   /// Files picked when the Tray first shows (render tests use it; the island starts with none).
@@ -156,6 +157,7 @@ struct NotchShelfView: View {
           page: page, trayCount: tray.items.count, unreadCount: notifications.inbox.unreadTotal,
           pages: visiblePages,
           favorites: geometry.tuning.favorites, highlight: theme.highlight,
+          updateAvailable: updater.availableVersion != nil, onUpdate: openUpdateDialog,
           openFavorite: openWidget, select: setPage) { optionsMenu }
           .transition(.islandCapsule)
           .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { frame in
@@ -375,6 +377,11 @@ struct NotchShelfView: View {
     }
     Button("Take the Island Tour") { IslandTourController.shared.start() }
     Divider()
+    Button(action: openUpdateDialog) {
+      Label(updater.availableVersion.map { L10n.tr("Update to %@", $0) } ?? L10n.tr("Check for Updates"),
+            systemImage: "arrow.down.circle")
+    }
+    .disabled(updater.isChecking)
     Button("Settings…") {
       NotchShelfController.shared.dismissShelf()
       SettingsWindowController.shared.show()
@@ -383,6 +390,11 @@ struct NotchShelfView: View {
       presentation.isPresentingConfirmation = true
     }
     .disabled(store.entries.isEmpty)
+  }
+
+  private func openUpdateDialog() {
+    NotchShelfController.shared.dismissShelf()
+    updater.checkInteractively()
   }
 
   /// The shape's corner/shoulder blend: open, or part-way for the HUD card so it reads as a card.

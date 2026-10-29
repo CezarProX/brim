@@ -124,6 +124,22 @@ Releases are not notarized by Apple yet, so the first launch is blocked. Open **
 Privacy & Security**, scroll down to the message about Brim and click **Open Anyway**. You only
 need to do this once.
 
+The island itself needs no privacy permissions. If you only see Command Center, click its
+**Open Island** button (the island icon in the header), or right-click Brim's menu-bar icon and
+choose **Open Island**. This also re-enables the island on the current display and keeps it open
+until you move the pointer onto it and then away. New installs keep the island visible over fullscreen apps; you can opt into hiding it in Settings → Island.
+
+## Updates
+
+From version 1.0.1, Brim checks for signed GitHub releases in the background. When one is
+available, click the green update arrow in the island, then choose **Install Update** in the
+update window. Brim downloads the update, replaces the app and relaunches; you keep your settings.
+You can also right-click the island’s navigation bar and choose **Check for Updates**.
+
+Users on 1.0.0 need to download and install 1.0.1 once to get the updater. Future updates install
+from the app. Publishing a signed GitHub release makes it available to installed copies; pushing
+source changes alone does not. See [Releasing](docs/RELEASING.md).
+
 ## Permissions
 
 Brim asks for each permission when you first use the feature that needs it, or from the
@@ -142,9 +158,10 @@ introduction shown on first launch (Settings → About → Replay introduction).
 
 ## Privacy
 
-Everything runs on your Mac. Brim has no accounts, analytics or telemetry. It only goes online
-for features you turn on or use: lyrics, weather, and uploading a screenshot when you press
-Upload. The first upload to a host tells you where it goes and asks first. The full list, and
+Everything runs on your Mac. Brim has no accounts, analytics or telemetry. It checks GitHub
+Releases for signed updates once a day; you can turn background checks off in Settings → About.
+It also goes online for features you turn on or use: lyrics, weather, and uploading a screenshot
+when you press Upload. The first upload to a host tells you where it goes and asks first. The full list, and
 what each service receives, is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Brim uses a few private macOS frameworks (MediaRemote for now playing, SkyLight for the lock
@@ -178,7 +195,7 @@ During a capture:
 
 ## Build from source
 
-Brim is a pure Swift package with no dependencies.
+Brim is a Swift package using Sparkle for signed in-app updates.
 
 ```bash
 git clone https://github.com/CezarProX/brim.git

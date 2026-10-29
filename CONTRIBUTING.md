@@ -5,8 +5,8 @@ Thanks for wanting to help. Brim is a small project, so the process is light.
 ## Before you start
 
 - For anything bigger than a small fix, open an issue first so we can agree on the approach.
-- Brim is a pure Swift Package with no external dependencies. Please keep it that way unless
-  there is a strong reason; propose new dependencies in an issue first.
+- Brim is a Swift Package with one external dependency: Sparkle, for signed in-app updates.
+  Keep dependencies minimal; propose additional dependencies in an issue first.
 
 ## Building and testing
 
@@ -15,7 +15,7 @@ Requirements: macOS 14 or later to run; Xcode 26 or later to build (the Liquid G
 ```bash
 swift build                          # debug build
 swift test --no-parallel             # the full test suite (Swift Testing)
-BRIM_ALLOW_ADHOC=1 ./build_app.sh    # build/Brim.app, ad-hoc signed
+BRIM_ALLOW_ADHOC=1 ./build_app.sh     # build/Brim.app; ad-hoc only if no stable identity exists
 open build/Brim.app
 ```
 
@@ -25,6 +25,12 @@ picks it up automatically and the permissions stay granted.
 
 Some tests render views and compare pixels, or need a display; if one of those fails on your
 machine, mention it in the pull request rather than changing the threshold.
+
+## Releases
+
+See [docs/RELEASING.md](docs/RELEASING.md) for building and publishing the signed update feed.
+`BRIM_PUBLIC_RELEASE_ADHOC=1` explicitly builds the current public, non-notarized distribution;
+it does not replace the stable identity used by normal development builds.
 
 ## Pull requests
 

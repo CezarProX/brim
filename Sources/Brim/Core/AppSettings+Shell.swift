@@ -143,7 +143,7 @@ extension AppSettings {
         set { defaults.set(newValue, forKey: ShellKey.haptics) }
     }
     var shellHideOnFullscreen: Bool {
-        get { shellBool(ShellKey.hideOnFullscreen, true) }
+        get { shellBool(ShellKey.hideOnFullscreen, false) }
         set { defaults.set(newValue, forKey: ShellKey.hideOnFullscreen) }
     }
     var shellHideInMissionControl: Bool {

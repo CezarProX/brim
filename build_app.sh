@@ -24,7 +24,13 @@ LOCAL_KEYCHAIN=""
 LOCAL_REQUIREMENT=""
 # Keep an existing local development identity stable even if a new Apple
 # certificate appears later. An explicit identity override takes precedence.
-if [[ -z "$REQUESTED_IDENTITY" && -d "$LOCAL_SIGNING_DIR" ]]; then
+if [[ "${BRIM_PUBLIC_RELEASE_ADHOC:-0}" == "1" ]]; then
+    if [[ -n "$REQUESTED_IDENTITY" ]]; then
+        echo "error: choose BRIM_PUBLIC_RELEASE_ADHOC or BRIM_SIGNING_IDENTITY, not both." >&2
+        exit 1
+    fi
+    SIGN_IDENTITY="-"
+elif [[ -z "$REQUESTED_IDENTITY" && -d "$LOCAL_SIGNING_DIR" ]]; then
     if [[ "$(stat -f '%Lp' "$LOCAL_SIGNING_DIR")" != "700" ]]; then
         echo "error: the local signing directory must have permissions 700." >&2
         exit 1
@@ -74,9 +80,15 @@ if [[ -z "$SIGN_IDENTITY" ]]; then
 fi
 
 echo "==> Building $APP_NAME (release)..."
-swift build -c release
+swift build --disable-keychain -c release
 
-BINARY_PATH="$(swift build -c release --show-bin-path)/$PRODUCT_NAME"
+BINARY_DIR="$(swift build --disable-keychain -c release --show-bin-path)"
+BINARY_PATH="$BINARY_DIR/$PRODUCT_NAME"
+SPARKLE_FRAMEWORK="$BINARY_DIR/Sparkle.framework"
+if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
+    echo "error: SwiftPM did not provide Sparkle.framework beside the executable." >&2
+    exit 1
+fi
 
 if [ ! -f "$BINARY_PATH" ]; then
     echo "error: expected binary not found at $BINARY_PATH" >&2
@@ -90,6 +102,10 @@ mkdir -p "$RESOURCES_DIR"
 
 cp "$BINARY_PATH" "$MACOS_DIR/$APP_NAME"
 cp "$SCRIPT_DIR/Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
+mkdir -p "$CONTENTS_DIR/Frameworks"
+# ditto preserves the versioned framework's symlinks and helper executables.
+ditto "$SPARKLE_FRAMEWORK" "$CONTENTS_DIR/Frameworks/Sparkle.framework"
+cp "$SCRIPT_DIR/THIRD_PARTY_NOTICES.md" "$RESOURCES_DIR/THIRD_PARTY_NOTICES.md"
 
 # App icon: the Brim logo (Resources/AppIcon/BrimLogo.png), scaled to every size macOS asks for
 # into an .iconset and packed by iconutil. Info.plist names it via CFBundleIconFile = Brim. The PNG
@@ -121,6 +137,7 @@ clang -dynamiclib -fobjc-arc -O2 -arch arm64 -arch x86_64 -framework Foundation 
 codesign --force --sign - "$RESOURCES_DIR/BrimMediaRemote.dylib"
 cp "$HELPER_DIR/brim-mediaremote.pl" "$RESOURCES_DIR/brim-mediaremote.pl"
 
+SIGN_ARGS=(--timestamp=none)
 if [[ -n "$LOCAL_KEYCHAIN" ]]; then
     echo "==> Signing with the existing local development certificate."
     # codesign's certificate resolution also consults the search list. Add this
@@ -151,18 +168,34 @@ if [[ -n "$LOCAL_KEYCHAIN" ]]; then
         security list-keychains -d user -s "${signing_keychains[@]}" "$LOCAL_KEYCHAIN"
     fi
     security unlock-keychain -p "$(cat "$LOCAL_SIGNING_DIR/keychain-password")" "$LOCAL_KEYCHAIN"
-    codesign --force --deep --options runtime --timestamp=none \
-        --keychain "$LOCAL_KEYCHAIN" --requirements "=$LOCAL_REQUIREMENT" \
-        --entitlements "$SCRIPT_DIR/Resources/Brim.entitlements" \
-        --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+    SIGN_ARGS=(--options runtime --timestamp=none --keychain "$LOCAL_KEYCHAIN")
 elif [[ "$SIGN_IDENTITY" == "-" ]]; then
-    echo "==> Explicit ad-hoc test build; privacy permissions may not survive rebuilding."
-    codesign --force --deep --entitlements "$SCRIPT_DIR/Resources/Brim.entitlements" --sign - "$APP_BUNDLE"
+    echo "==> Explicit ad-hoc build; privacy permissions may not survive rebuilding."
 else
     echo "==> Code signing with: $SIGN_IDENTITY"
-    codesign --force --deep --options runtime --entitlements "$SCRIPT_DIR/Resources/Brim.entitlements" --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+    SIGN_ARGS=(--options runtime)
 fi
-codesign --verify --strict "$APP_BUNDLE"
+# Sign nested Sparkle code from the inside out. Preserve its own sandbox entitlements;
+# Brim's entitlements and local designated requirement apply only to the outer app.
+EMBEDDED_SPARKLE="$CONTENTS_DIR/Frameworks/Sparkle.framework"
+SPARKLE_VERSION="$EMBEDDED_SPARKLE/Versions/Current"
+for nested_code in \
+    "$SPARKLE_VERSION/Autoupdate" \
+    "$SPARKLE_VERSION/Updater.app" \
+    "$SPARKLE_VERSION/XPCServices/Downloader.xpc" \
+    "$SPARKLE_VERSION/XPCServices/Installer.xpc" \
+    "$EMBEDDED_SPARKLE"; do
+    codesign --force "${SIGN_ARGS[@]}" --preserve-metadata=entitlements \
+        --sign "$SIGN_IDENTITY" "$nested_code"
+done
+if [[ -n "$LOCAL_REQUIREMENT" ]]; then
+    codesign --force "${SIGN_ARGS[@]}" --requirements "=$LOCAL_REQUIREMENT" \
+        --entitlements "$SCRIPT_DIR/Resources/Brim.entitlements" --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+else
+    codesign --force "${SIGN_ARGS[@]}" --entitlements "$SCRIPT_DIR/Resources/Brim.entitlements" \
+        --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+fi
+codesign --verify --deep --strict "$APP_BUNDLE"
 
 echo ""
 echo "Build succeeded: $APP_BUNDLE"

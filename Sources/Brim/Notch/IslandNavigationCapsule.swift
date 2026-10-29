@@ -42,6 +42,9 @@ struct IslandNavigationCapsule<MenuContent: View>: View {
   var favorites: [IslandWidgetTile] = []
   /// Replaces the selection fill's white when the user picked a highlight colour.
   var highlight: Color?
+  /// A signed release is available; keep its install action within reach after the HUD fades.
+  var updateAvailable = false
+  var onUpdate: () -> Void = {}
   var openFavorite: (IslandWidgetTile) -> Void = { _ in }
   let select: (IslandPage) -> Void
   @ViewBuilder let menu: () -> MenuContent
@@ -57,6 +60,19 @@ struct IslandNavigationCapsule<MenuContent: View>: View {
         Capsule().fill(Color.white.opacity(0.16)).frame(width: 1, height: 16).padding(.horizontal, 3)
         ForEach(favorites) { tile in favorite(tile) }
       }
+      if updateAvailable {
+        Button(action: onUpdate) {
+          Image(systemName: "arrow.down.circle.fill")
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.green)
+            .frame(width: IslandNavigationLayout.item, height: IslandNavigationLayout.item)
+            .contentShape(Circle())
+        }
+        .buttonStyle(IslandPressStyle(pressedScale: 0.88))
+        .help("Install Update…")
+        .accessibilityLabel("Install Update…")
+        .transition(.scale.combined(with: .opacity))
+      }
     }
     .padding(IslandNavigationLayout.inset)
     // Liquid Glass on macOS 26: SwiftUI's own glass, which fades with the capsule. Solid before:
@@ -69,6 +85,7 @@ struct IslandNavigationCapsule<MenuContent: View>: View {
     .animation(NotchMotion.press(reduceMotion: reduceMotion), value: unreadCount)
     .animation(NotchMotion.layout(reduceMotion: reduceMotion), value: favorites)
     .animation(NotchMotion.layout(reduceMotion: reduceMotion), value: pages)
+    .animation(NotchMotion.layout(reduceMotion: reduceMotion), value: updateAvailable)
     .contextMenu { menu() }
   }
 

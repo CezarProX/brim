@@ -2754,3 +2754,10 @@
 "Pinned. Click to follow the latest session again." = "Fixat. Apasă ca să urmărești din nou cea mai recentă sesiune.";
 "To use the YouTube Music queue, turn on Allow JavaScript from Apple Events in Chrome: View › Developer." = "Ca să folosești coada YouTube Music, pornește în Chrome: View › Developer › Allow JavaScript from Apple Events.";
 "Couldn't restart Finder" = "Finder nu a putut fi repornit";
+"Open Island" = "Deschide insula";
+"Install Update…" = "Instalează actualizarea…";
+"Update to %@" = "Actualizează la %@";
+"Checking for Updates…" = "Se caută actualizări…";
+"Signed updates come from Brim’s GitHub Releases. Install and relaunch from the island without downloading the app again. Background checks never install updates automatically." = "Actualizările semnate provin din lansările Brim de pe GitHub. Instalează și repornește din insulă, fără să descarci din nou aplicația. Verificările din fundal nu instalează niciodată actualizări automat.";
+
+"Install a release build of Brim to use signed updates." = "Instalează o versiune publicată de Brim pentru actualizări semnate.";

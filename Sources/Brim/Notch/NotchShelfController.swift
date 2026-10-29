@@ -188,6 +188,13 @@ final class NotchShelfController: NSObject {
         }
     }
 
+    private let pointerLocation: () -> CGPoint
+
+    init(pointerLocation: @escaping () -> CGPoint = { NSEvent.mouseLocation }) {
+        self.pointerLocation = pointerLocation
+        super.init()
+    }
+
     private var surfaces: [Surface] = []
     private var timer: Timer?
     /// Counts ticks so an idle island can skip most of them.
@@ -272,7 +279,7 @@ final class NotchShelfController: NSObject {
 
     /// Opens the notch on the display with the pointer, showing the convert card for these files.
     func presentConvert(_ urls: [URL]) {
-        let pointer = NSEvent.mouseLocation
+        let pointer = pointerLocation()
         guard !urls.isEmpty,
               let surface = surfaces.first(where: { $0.presentation.geometry.screenFrame.contains(pointer) })
                 ?? surfaces.first else { return }
@@ -282,7 +289,7 @@ final class NotchShelfController: NSObject {
 
     /// Opens the island on LocalSend's nearby devices for these files.
     func presentLocalSend(_ urls: [URL]) {
-        let pointer = NSEvent.mouseLocation
+        let pointer = pointerLocation()
         guard !urls.isEmpty,
               let surface = surfaces.first(where: { $0.presentation.geometry.screenFrame.contains(pointer) })
                 ?? surfaces.first else { return }
@@ -294,7 +301,7 @@ final class NotchShelfController: NSObject {
 
     /// Opens the island on the clipboard library, on the display under the pointer (⌥⇧Space).
     func presentClipboard() {
-        let pointer = NSEvent.mouseLocation
+        let pointer = pointerLocation()
         guard let surface = surfaces.first(where: { $0.presentation.geometry.screenFrame.contains(pointer) })
             ?? surfaces.first else { return }
         let presentation = surface.presentation
@@ -307,7 +314,7 @@ final class NotchShelfController: NSObject {
         presentation.isShowingLibrary = true
         presentation.openedFromClipboard = true
         presentation.trayTab = .clipboard
-        setExpanded(true, on: surface)
+        open(surface, pinned: true)
     }
 
     /// True while any display's island is open (the spacebar play/pause shortcut needs it).
@@ -316,7 +323,7 @@ final class NotchShelfController: NSObject {
     /// Opens the island on one widget, on the display under the pointer (Text Capture results,
     /// droplet shortcuts). It stays open until the pointer visits and leaves.
     func presentWidget(_ tile: IslandWidgetTile) {
-        let pointer = NSEvent.mouseLocation
+        let pointer = pointerLocation()
         guard tile.opensInIsland,
               let surface = surfaces.first(where: { $0.presentation.geometry.screenFrame.contains(pointer) })
                 ?? surfaces.first else { return }
@@ -400,11 +407,30 @@ final class NotchShelfController: NSObject {
 
     /// ⌥⌘N: open or close the island on the display under the pointer.
     func toggleUnderPointer() {
-        let pointer = NSEvent.mouseLocation
+        let pointer = pointerLocation()
         guard let target = surfaces.first(where: { $0.presentation.geometry.screenFrame.contains(pointer) }) ?? surfaces.first
         else { return }
         target.hiddenUntil = nil
         if target.presentation.isExpanded { close(target) } else { open(target, pinned: true) }
+    }
+
+    /// An explicit menu-bar action also recovers an island disabled or hidden in Settings.
+    /// Opening the shell never requests Screen Recording or Accessibility access.
+    func showIsland() {
+        guard !suspended else { return }
+        AppSettings.shared.notchShelfEnabled = true
+        settingsChanged()
+        let pointer = pointerLocation()
+        guard let target = surfaces.first(where: { $0.presentation.geometry.screenFrame.contains(pointer) })
+            ?? surfaces.first else { return }
+        if let uuid = target.displayUUID {
+            AppSettings.shared.shellDisabledDisplays = AppSettings.shared.shellDisabledDisplays.filter { $0 != uuid }
+        }
+        target.hiddenUntil = nil
+        target.visibility = .visible
+        open(target, pinned: true)
+        target.panel.orderFrontRegardless()
+        setAlpha(1, on: target)
     }
 
     /// Clicking the collapsed notch opens it even when hover-open is off; with auto-collapse off,
@@ -555,7 +581,7 @@ final class NotchShelfController: NSObject {
 
     private func tick() {
         guard !suspended, AppSettings.shared.notchShelfEnabled else { return }
-        let pointer = NSEvent.mouseLocation
+        let pointer = pointerLocation()
         // Closed and the pointer nowhere near an island: run at 10 Hz and sample the window list
         // less often. Hover, animations and open islands keep the full 30 Hz.
         let idle = isIdle(pointer: pointer)
@@ -790,7 +816,7 @@ final class NotchShelfController: NSObject {
     /// The island the Island Tour teaches on: the display under the pointer when its island shows,
     /// else the first one showing. With `requireVisible` false it falls back to any display.
     func tourPresentation(requireVisible: Bool) -> NotchPresentation? {
-        let pointer = NSEvent.mouseLocation
+        let pointer = pointerLocation()
         let underPointer: (Surface) -> Bool = { $0.presentation.geometry.screenFrame.contains(pointer) }
         let shown = surfaces.filter { $0.visibility != .hidden }
         if let pick = shown.first(where: underPointer) ?? shown.first { return pick.presentation }
@@ -870,7 +896,7 @@ final class NotchShelfController: NSObject {
             surface.presentation.expandedForNotification = false
         }
         surface.panel.ignoresMouseEvents = !expanded
-            || !surface.presentation.geometry.containsPointer(NSEvent.mouseLocation, expanded: true)
+            || !surface.presentation.geometry.containsPointer(pointerLocation(), expanded: true)
         if !expanded, surface.panel.isKeyWindow { surface.panel.resignKey() }
     }
 }

@@ -4,15 +4,15 @@
 import Foundation
 
 extension AppSettings {
-    /// HTTPS appcast or JSON release feed. Empty (the default) means "no update source configured".
+    /// Legacy check-only feed, retained for settings compatibility. Installations use the signed official feed.
     var updateFeedURL: String {
         get { defaults.string(forKey: "updateFeedURL") ?? "" }
         set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "updateFeedURL") }
     }
 
-    /// Opt-in: look for a new version in the background about once a day (only with a feed set).
+    /// Check official signed releases once a day. Installation still requires an explicit user action.
     var updateAutoCheck: Bool {
-        get { defaults.object(forKey: "updateAutoCheck") as? Bool ?? false }
+        get { defaults.object(forKey: "updateAutoCheck") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "updateAutoCheck") }
     }
 

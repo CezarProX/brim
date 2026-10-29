@@ -1,8 +1,8 @@
 # Brim Architecture
 
 Brim is a menu-bar-only (`.accessory`, `LSUIElement`) macOS screenshot
-utility, built as a pure Swift Package Manager executable (no SPM
-dependencies — AppKit / ScreenCaptureKit / Carbon / UserNotifications only)
+utility, built as a Swift Package Manager executable (AppKit / ScreenCaptureKit / Carbon /
+UserNotifications, plus Sparkle for signed application updates)
 and assembled into a `.app` bundle by `build_app.sh`.
 
 ## Module layout
@@ -127,9 +127,9 @@ Known simplifications made during integration:
   with `nil` and degrades to a clipboard copy; the overlay is intentionally
   left open in that case rather than torn down, since nothing was actually
   "shared" to close out on.
-- The "Check for Updates" menu item is a placeholder alert
-  ("You're up to date. Brim 1.0.0.") — no real update feed/server
-  exists yet.
+- `AppUpdater` probes the fixed signed GitHub Releases appcast daily and exposes availability
+  to the island. Explicit update actions open Sparkle’s verified installer and relaunch flow.
+  `scripts/release.sh` signs the archive and feed using the publisher’s Keychain key.
 
 ## Ownership by directory (historical — parallel agent work is complete)
 

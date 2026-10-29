@@ -92,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        AppUpdater.shared.stop()
         DemoController.shared.stop()
         HotkeyManager.shared.unregister()
         HotkeyManager.shared.unregisterRing()
@@ -188,6 +189,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         commandCenter.target = self
         menu.addItem(commandCenter)
 
+        let openIsland = NSMenuItem(title: L10n.tr("Open Island"), action: #selector(openIslandAction), keyEquivalent: "")
+        openIsland.target = self
+        menu.addItem(openIsland)
+
         let shelf = NSMenuItem(title: L10n.tr("Notch Settings…"), action: #selector(showPreferencesAction), keyEquivalent: "")
         shelf.target = self
         menu.addItem(shelf)
@@ -268,6 +273,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showCommandCenterAction() {
         CommandCenterController.shared.show(anchoredTo: statusItem?.button)
+    }
+
+    @objc private func openIslandAction() {
+        NotchShelfController.shared.showIsland()
     }
 
     @objc private func showScreenshotHistoryAction() {
