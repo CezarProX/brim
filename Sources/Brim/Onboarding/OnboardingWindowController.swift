@@ -134,6 +134,15 @@ final class OnboardingWindow: NSWindow {
   private static let dragBand: CGFloat = 40
   var onKey: ((OnboardingKey) -> Void)?
 
+  override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask,
+                backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+    super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+    // A first launch can happen while another app occupies a fullscreen Space. Bring the
+    // introduction there instead of leaving it behind on the desktop.
+    collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+    hidesOnDeactivate = false
+  }
+
   override var canBecomeKey: Bool { true }
   override var canBecomeMain: Bool { true }
 

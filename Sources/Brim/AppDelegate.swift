@@ -42,7 +42,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startIslandFeatures()
         UpdateChecker.shared.startAutoCheck()
 
-        NotificationCenterHelper.requestAuthorization()
+        // The introduction belongs to application startup, not the menu-bar icon's lifecycle.
+        // Its Permissions page requests notification access explicitly, without a competing
+        // system permission prompt obscuring the first-run window.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            OnboardingWindowController.shared.showIfNeeded()
+        }
 
         // Request capture access when the user starts a capture. Music and
         // calls remain usable without granting screen recording permission.
@@ -52,11 +57,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let event = NSAppleEventManager.shared().currentAppleEvent
         let senderPID = event?.attributeDescriptor(forKeyword: keySenderPIDAttr)?.int32Value
         let senderApp = senderPID.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
-        guard ReopenPolicy.opensSettings(sender: senderApp) else {
+        guard let destination = ReopenPolicy.destination(
+            sender: senderApp, onboardingCompleted: AppSettings.shared.onboardingCompleted) else {
             ReopenPolicy.log.notice("Ignored reopen from \(senderApp ?? "pid \(senderPID ?? 0)", privacy: .public)")
             return false
         }
-        SettingsWindowController.shared.show()
+        switch destination {
+        case .introduction: OnboardingWindowController.shared.show()
+        case .settings: SettingsWindowController.shared.show()
+        }
         return true
     }
 
@@ -303,10 +312,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// Which "reopen" requests open Settings. On macOS 27 the Siri app and its intelligence services
 /// reopen running apps while you click around; only launchers the user drives should open Settings.
 enum ReopenPolicy {
+    enum Destination: Equatable { case introduction, settings }
     static let log = Logger(subsystem: "io.github.cezarprox.brim", category: "reopen")
     private static let userLaunchers: Set<String> = ["com.apple.dock", "com.apple.finder", "com.apple.Spotlight"]
 
     static func opensSettings(sender: String?) -> Bool {
         sender.map(userLaunchers.contains) ?? false
+    }
+
+    static func destination(sender: String?, onboardingCompleted: Bool) -> Destination? {
+        guard opensSettings(sender: sender) else { return nil }
+        return onboardingCompleted ? .settings : .introduction
     }
 }

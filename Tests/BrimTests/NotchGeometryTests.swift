@@ -206,3 +206,29 @@ struct NotchGeometryTests {
         #expect(!geometry.triggerFrame.contains(CGPoint(x: 650, y: 960)))
     }
 }
+
+struct IslandBubbleCanvasTests {
+    @Test(arguments: [400.0, 800.0, 1512.0, 1920.0], [1.0, 1.18])
+    func expandedBubblesStayInsideNativeWindow(width: Double, scale: Double) {
+        for floating in [false, true] {
+            let screen = CGRect(x: -600, y: 200, width: width, height: 982)
+            var geometry = floating ? NotchGeometry.dynamicIsland(screenFrame: screen)
+                : NotchGeometry(screenFrame: screen, notchWidth: 185, notchHeight: 32)
+            geometry.tuning.openScale = scale
+            geometry.utilityContentHeight = 200
+            geometry.preferredWidth = 740
+            let stableCanvas = geometry.hostingFrame
+            geometry.hasLeadingBubble = true
+            geometry.hasSecondaryActivity = true
+            #expect(geometry.hostingFrame == stableCanvas)
+            for expanded in [false, true] {
+                for side in IslandBubbleSide.allCases {
+                    let bubble = geometry.bubbleFrame(side, expanded: expanded)
+                    #expect(geometry.hostingFrame.insetBy(dx: -0.01, dy: -0.01).contains(bubble),
+                            "Native window clips \(side) bubble, width=\(width), scale=\(scale), expanded=\(expanded)")
+                    #expect(screen.insetBy(dx: -0.01, dy: -0.01).contains(bubble))
+                }
+            }
+        }
+    }
+}

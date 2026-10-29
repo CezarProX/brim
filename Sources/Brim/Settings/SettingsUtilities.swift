@@ -10,7 +10,7 @@ enum SettingsUtilities {
 
   static var domainName: String { Bundle.main.bundleIdentifier ?? "io.github.cezarprox.brim" }
   static var appVersion: String {
-    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.1"
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.2"
   }
   static var buildNumber: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "dev" }
 

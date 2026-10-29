@@ -208,7 +208,12 @@ struct NotchGeometry {
         guard notificationBodyHeight == nil, openScale != 1 else { return 1 }
         let natural = naturalExpandedSize
         guard natural.width > 0 else { return 1 }
-        return max(1, min(openScale, (screenFrame.width - 24) / natural.width))
+        return max(1, min(openScale, availableOpenWidth / natural.width))
+    }
+
+    /// Scaling must leave the same room for companions as the unscaled layout.
+    private var availableOpenWidth: CGFloat {
+        max(0, screenFrame.width - 24 - (hasBubble ? 2 * (secondarySize.width + Self.bubbleGap) : 0))
     }
 
     /// The open size before scaling: the layout the content is built for.
@@ -220,7 +225,7 @@ struct NotchGeometry {
         let natural: CGFloat = compactMusicLayout || compactStatusLayout ? 420
             : utilityContentHeight != nil ? min(740, preferredWidth ?? 480) : 600
         // The open island stays centred, so a bubble on either side needs its room on both.
-        let width = max(0, min(natural, screenFrame.width - (hasBubble ? 2 * (secondarySize.width + Self.bubbleGap) + 24 : 24)))
+        let width = min(natural, availableOpenWidth)
         let height: CGFloat = compactMusicLayout
             ? musicTopInset + (MusicPlayerLayout.height + (audioDrawerExpanded ? MusicPlayerLayout.drawerHeight : 0)) * width / MusicPlayerLayout.width + musicSummaryHeight
             : compactStatusLayout ? max(notchHeight, 12) + 142
@@ -237,7 +242,10 @@ struct NotchGeometry {
     /// Hover still uses panelFrame, which describes only the visible expanded shell.
     var hostingFrame: CGRect {
         let scale = max(1, openScale)
-        let width = max(0, min(740 * scale, screenFrame.width - 24))
+        // Reserve both companion circles even before they appear, so activity changes do not
+        // resize the native window or clip bubbles beside a wide/enlarged Home shelf.
+        let companionRoom = 2 * (secondarySize.width + Self.bubbleGap)
+        let width = max(0, min(740 * scale + companionRoom, screenFrame.width - 24))
         let musicWidth = max(0, min(420, screenFrame.width - 24))
         let body = max(max(notchHeight, 12) + IslandNavigationLayout.maxPageHeight,
                        musicTopInset + (MusicPlayerLayout.height + MusicPlayerLayout.drawerHeight) * musicWidth / MusicPlayerLayout.width + max(48, musicSummaryHeight))

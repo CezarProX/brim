@@ -22,8 +22,6 @@ final class MenuBarController: NSObject {
     observe()
     applyStyle()
     refresh()
-    // First run: greet with the tour once the menu bar has settled.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { OnboardingWindowController.shared.showIfNeeded() }
   }
 
   func detach() {

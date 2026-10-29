@@ -59,11 +59,13 @@ struct IslandBubbleRenderTests {
   }
 
   /// The real shell with music, a 24-minute timer and a working agent.
-  private func renderScene(_ surface: Surface, expanded: Bool) async throws -> (NSBitmapImageRep, NotchPresentation, CGSize) {
+  private func renderScene(_ surface: Surface, expanded: Bool, wideHome: Bool = false) async throws -> (NSBitmapImageRep, NotchPresentation, CGSize) {
     CodingAgentModel.shared.setSessionsForPreview([agentSession(.running("Bash"))])
     defer { CodingAgentModel.shared.setSessionsForPreview([]) }
     let presentation = NotchPresentation()
-    let geometry = surface.geometry()
+    var geometry = surface.geometry()
+    if wideHome { geometry.tuning.openScale = 1.18 }
+    presentation.homeTapped = wideHome
     presentation.geometry = geometry
     presentation.isExpanded = expanded
     let artwork = Self.artworkPNG()
@@ -75,11 +77,12 @@ struct IslandBubbleRenderTests {
     await timers.refreshNow()
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let size = expanded ? CGSize(width: 860, height: 420) : Self.canvas
+    let size = wideHome ? geometry.hostingFrame.size : expanded ? CGSize(width: 860, height: 420) : Self.canvas
     let view = NotchShelfView(
       presentation: presentation, store: ShelfStore(directory: directory), nowPlaying: music,
       calls: CallActivityModel(accessibilityTrusted: { false }), recording: ScreenRecordingModel(probe: { nil }),
-      timers: timers, notifications: NotificationHUDModel(settings: settings()),
+      timers: timers, homeWidgets: HomeWidgetStore(widgets: [.media, .captures], persist: { _ in }),
+      notifications: NotificationHUDModel(settings: settings()),
       glances: IslandGlanceModel(settings: settings()), theme: IslandTheme(surface: .black),
       playingNext: PlayingNextModel(read: { _ in "" }, perform: { _ in "" }, fetchArtwork: { _ in nil }))
     let host = NSHostingView(
@@ -115,6 +118,18 @@ struct IslandBubbleRenderTests {
       }
     }
     try writeSheet(rows, name: "bubbles-island")
+  }
+
+  @Test func wideHomeBubblesRenderInsideTheNativeCanvas() async throws {
+    var rows: [(String, NSImage)] = []
+    for surface in Surface.allCases {
+      let (bitmap, presentation, size) = try await renderScene(surface, expanded: true, wideHome: true)
+      checkBubbles(bitmap, geometry: presentation.geometry, size: size, expanded: true, label: surface.rawValue)
+      let image = NSImage(size: size)
+      image.addRepresentation(bitmap)
+      rows.append((surface.rawValue, image))
+    }
+    try writeSheet(rows, name: "bubbles-wide-home-native")
   }
 
   /// Each bubble black and round where the geometry says, a clear gap to the island, and nothing
