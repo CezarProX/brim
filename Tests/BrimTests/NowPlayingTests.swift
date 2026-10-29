@@ -329,6 +329,15 @@ struct NowPlayingModelTests {
 }
 
 struct YouTubeMusicAccessibilityTests {
+  /// Two YouTube Music windows: the playing one names the song, wherever it sits. Reading only the
+  /// first window kept a paused "Chicago" in the island after another song started (seen live).
+  @Test func severalWindowsReadTheOneThatIsPlaying() {
+    #expect(NowPlayingAccessibility.preferredPlayerIndex(playing: [false, true]) == 1)
+    #expect(NowPlayingAccessibility.preferredPlayerIndex(playing: [true, false]) == 0)
+    #expect(NowPlayingAccessibility.preferredPlayerIndex(playing: [false, false]) == 0)
+    #expect(NowPlayingAccessibility.preferredPlayerIndex(playing: []) == nil)
+  }
+
     @Test func scopedPlayerClickStaysInsideVerifiedWindow() {
         let window = CGRect(x: 100, y: 50, width: 600, height: 400)
         #expect(NowPlayingAccessibility.scopedClickPoint(

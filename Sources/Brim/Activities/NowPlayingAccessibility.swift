@@ -23,14 +23,16 @@ enum NowPlayingAccessibility {
         /// Web documents passed on the way, such as music.youtube.com/watch?v=….
         var webAreas: [(element: AXUIElement, url: String)] = []
     }
-    /// The player bar found by the last full search, so each poll reads ~40 nodes instead of
-    /// searching up to 800. The page's web area is kept too, for the playing video's URL.
+    /// The player bars found by the last full search (one per YouTube Music window), so each poll
+    /// reads ~40 nodes per window instead of searching up to 800. The page's web area is kept too,
+    /// for the playing video's URL; `windowCount` notices a window opening or closing.
     private struct CachedPlayer: @unchecked Sendable {
         let pid: pid_t
         let toolbar: AXUIElement
         let webArea: AXUIElement?
+        let windowCount: Int
     }
-    private static let cachedPlayer = OSAllocatedUnfairLock<CachedPlayer?>(initialState: nil)
+    private static let cachedPlayers = OSAllocatedUnfairLock<[CachedPlayer]>(initialState: [])
     private static let previous = ["Previous", "Previous track", "Înapoi", "Anterior", "Melodia anterioară"]
     private static let next = ["Next", "Next track", "Înainte", "Următorul", "Melodia următoare"]
     private static let play = ["Play", "Redă", "Redare"]
@@ -153,32 +155,55 @@ enum NowPlayingAccessibility {
         let pid = app.processIdentifier
         let application = AXUIElementCreateApplication(pid)
         requestFullTree(application, pid: pid)
-        if window == nil, let cached = cachedPlayer.withLock({ $0 }), cached.pid == pid {
-            AXUIElementSetMessagingTimeout(cached.toolbar, 0.1)
-            let result = walk(cached.toolbar, findToolbar: false)
-            if result.nodes.first?.text.role == kAXToolbarRole
-                || result.nodes.contains(where: { $0.text.label == "PLAYBACK_CONTROLS" }) {
-                guard !requireComplete || result.complete else {
-                    throw NowPlayingFailure.unavailable("The YouTube Music player is busy. Try the control again.")
+        let windows = window == nil ? attribute(application, kAXWindowsAttribute) as? [AXUIElement] ?? [] : []
+        if window == nil {
+            let cached = cachedPlayers.withLock { $0 }
+            if !cached.isEmpty, cached.allSatisfy({ $0.pid == pid && $0.windowCount == windows.count }) {
+                let reads = cached.map { player -> WalkResult in
+                    AXUIElementSetMessagingTimeout(player.toolbar, 0.1)
+                    return walk(player.toolbar, findToolbar: false)
                 }
-                let pageURL = cached.webArea.flatMap { attribute($0, kAXURLAttribute) }.flatMap(urlString)
-                return (result.nodes, pageURL.flatMap(watchPage))
+                if reads.allSatisfy(isPlayerBar), let index = preferredPlayerIndex(playing: reads.map(isPlaying)) {
+                    guard !requireComplete || reads[index].complete else {
+                        throw NowPlayingFailure.unavailable("The YouTube Music player is busy. Try the control again.")
+                    }
+                    let pageURL = cached[index].webArea.flatMap { attribute($0, kAXURLAttribute) }.flatMap(urlString)
+                    return (reads[index].nodes, pageURL.flatMap(watchPage))
+                }
             }
-            cachedPlayer.withLock { $0 = nil }
+            cachedPlayers.withLock { $0 = [] }
         }
-        let root = window ?? application
-        AXUIElementSetMessagingTimeout(root, 0.1)
-        let search = walk(root, findToolbar: true)
-        guard let toolbar = search.playerBar else { return ([], nil) }
-        let result = walk(toolbar, findToolbar: false)
-        guard !requireComplete || result.complete else {
+        // With several windows each is searched on its own, so the playing one can be told apart.
+        let roots = window.map { [$0] } ?? (windows.count > 1 ? windows : [application])
+        var found: [(player: CachedPlayer, result: WalkResult, pageURL: String?)] = []
+        for root in roots {
+            AXUIElementSetMessagingTimeout(root, 0.1)
+            let search = walk(root, findToolbar: true)
+            guard let toolbar = search.playerBar else { continue }
+            let page = playingPageIndex(search.webAreas.map(\.url)).map { search.webAreas[$0] }
+            found.append((CachedPlayer(pid: pid, toolbar: toolbar, webArea: page?.element, windowCount: windows.count),
+                          walk(toolbar, findToolbar: false), page.flatMap { watchPage($0.url) }))
+        }
+        guard let index = preferredPlayerIndex(playing: found.map { isPlaying($0.result) }) else { return ([], nil) }
+        guard !requireComplete || found[index].result.complete else {
             throw NowPlayingFailure.unavailable("The YouTube Music player is busy. Try the control again.")
         }
-        let page = playingPageIndex(search.webAreas.map(\.url)).map { search.webAreas[$0] }
-        if window == nil {
-            cachedPlayer.withLock { $0 = CachedPlayer(pid: pid, toolbar: toolbar, webArea: page?.element) }
-        }
-        return (result.nodes, page.flatMap { watchPage($0.url) })
+        if window == nil { cachedPlayers.withLock { $0 = found.map(\.player) } }
+        return (found[index].result.nodes, found[index].pageURL)
+    }
+
+    private static func isPlayerBar(_ result: WalkResult) -> Bool {
+        result.nodes.first?.text.role == kAXToolbarRole || result.nodes.contains { $0.text.label == "PLAYBACK_CONTROLS" }
+    }
+
+    private static func isPlaying(_ result: WalkResult) -> Bool {
+        result.nodes.contains { matches($0.text, pause) }
+    }
+
+    /// With several YouTube Music windows, the one that is playing (its player shows Pause);
+    /// otherwise the first, as with a single window.
+    static func preferredPlayerIndex(playing: [Bool]) -> Int? {
+        playing.firstIndex(of: true) ?? (playing.isEmpty ? nil : 0)
     }
 
     /// The YouTube Music document, chosen by host rather than by its current URL: the player can be
