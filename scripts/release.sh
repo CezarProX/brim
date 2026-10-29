@@ -28,6 +28,8 @@ if [[ -n "$NOTES" && ! -f "$NOTES" ]]; then
     echo "error: release notes file does not exist." >&2
     exit 1
 fi
+# Fail before builds/artifact mutation when the stable signer is unavailable or ad-hoc is requested.
+"$ROOT/scripts/sign_app.sh" --check
 COMMIT="$(git rev-parse HEAD)"
 if git rev-parse --verify "$TAG" >/dev/null 2>&1; then
     [[ "$(git rev-list -n 1 "$TAG")" == "$COMMIT" ]] || { echo "error: existing tag points to another commit." >&2; exit 1; }
@@ -45,6 +47,8 @@ fi
 ./build_app.sh
 APP="$ROOT/build/Brim.app"
 BUILT_PLIST="$APP/Contents/Info.plist"
+# Exact DR equality to the public pin means every release satisfies every other release's DR.
+"$ROOT/scripts/sign_app.sh" --verify "$APP"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$BUILT_PLIST")" == "$VERSION" ]] || {
     echo "error: built app version does not match tag." >&2; exit 1;
 }

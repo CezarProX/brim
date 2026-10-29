@@ -44,6 +44,13 @@ MainActor.assumeIsolated {
                 } catch { lines.append("\(source.rawValue): failed: \(error)") }
             }
             lines += NowPlayingAccessibility.survey()
+            // Exercise the same stream/poll reconciliation that feeds Home, across two polls.
+            // Reading the app adapters alone misses a valid system song being erased by a poll.
+            let model = NowPlayingModel()
+            model.start()
+            try? await Task.sleep(for: .seconds(9))
+            lines.append("Model: stream=\(model.streamAlive) track=\(model.track != nil) playing=\(model.track?.isPlaying == true) inIsland=\(model.isInIsland())")
+            model.stop()
             try? lines.joined(separator: "\n").write(to: URL(fileURLWithPath: "/tmp/Brim-music-status.txt"), atomically: true, encoding: .utf8)
             app.terminate(nil)
         }

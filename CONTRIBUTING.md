@@ -15,13 +15,14 @@ Requirements: macOS 14 or later to run; Xcode 26 or later to build (the Liquid G
 ```bash
 swift build                          # debug build
 swift test --no-parallel             # the full test suite (Swift Testing)
-BRIM_ALLOW_ADHOC=1 ./build_app.sh     # build/Brim.app; ad-hoc only if no stable identity exists
+./build_app.sh                       # build/Brim.app with the pinned stable identity
 open build/Brim.app
 ```
 
-Ad-hoc signed builds change identity on every rebuild, so macOS may ask for Screen Recording and
-Accessibility again after each build. If you have an Apple Development certificate, `build_app.sh`
-picks it up automatically and the permissions stay granted.
+App bundles use the existing certificate pinned in `scripts/signing-policy.conf`; ad-hoc builds
+are refused because their changing identity resets macOS privacy permissions. The protected signing
+Keychain must be available before packaging. No identity is generated or changed automatically.
+See [Releasing](docs/RELEASING.md) for the current self-signed distribution limits and signing tests.
 
 Some tests render views and compare pixels, or need a display; if one of those fails on your
 machine, mention it in the pull request rather than changing the threshold.
@@ -29,8 +30,8 @@ machine, mention it in the pull request rather than changing the threshold.
 ## Releases
 
 See [docs/RELEASING.md](docs/RELEASING.md) for building and publishing the signed update feed.
-`BRIM_PUBLIC_RELEASE_ADHOC=1` explicitly builds the current public, non-notarized distribution;
-it does not replace the stable identity used by normal development builds.
+Public and local bundles use the same pinned certificate. `BRIM_PUBLIC_RELEASE_ADHOC` and
+`BRIM_ALLOW_ADHOC` are refused; no release can silently switch back to a changing ad-hoc identity.
 
 ## Pull requests
 

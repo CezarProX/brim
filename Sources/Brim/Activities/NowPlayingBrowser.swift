@@ -2,9 +2,12 @@ import Foundation
 
 /// Browser scripting is opt-in. Only the YouTube Music origin is inspected; no page text leaves the Mac.
 enum NowPlayingBrowser {
-    private static func all(_ kind: String, in container: NSAppleEventDescriptor = .null()) -> NSAppleEventDescriptor {
-        let ordinal = NSAppleEventDescriptor(enumCode: NowPlayingAppleEvents.code("all "))
-            .coerce(toDescriptorType: NowPlayingAppleEvents.code("abso")) ?? .null()
+    /// Every `kind` element of `container`. The selector is built as an absolute ordinal directly:
+    /// coercing an enum descriptor to `abso` yields nil, and the null selector failed with -1700.
+    static func all(_ kind: String, in container: NSAppleEventDescriptor = .null()) -> NSAppleEventDescriptor {
+        var every = NowPlayingAppleEvents.code("all ")
+        let ordinal = NSAppleEventDescriptor(descriptorType: NowPlayingAppleEvents.code("abso"), bytes: &every,
+                                             length: MemoryLayout<OSType>.size) ?? .null()
         return NowPlayingAppleEvents.object(want: kind, selector: ordinal, container: container)
     }
 

@@ -12,7 +12,6 @@ struct MusicPlayerCard: View {
     @ObservedObject var lyrics: LyricsModel = .shared
     /// Clearance above the content: the hardware notch on notched Macs, a small margin otherwise.
     var topInset: CGFloat = 45
-    var volumeModel: PlayerVolumeModel?
     /// Whether the Playing Next column is open; nil keeps it in local state (open by default).
     var showsQueue: Binding<Bool>?
     @State private var localShowsQueue = true
@@ -95,7 +94,6 @@ struct MusicPlayerCard: View {
             PlayerScrubber(track: track, seek: model.seek)
                 .padding(.top, 6)
             controls(track).padding(.top, 0)
-            PlayerVolumeSlider(model: volumeModel).padding(.top, 2)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Self.sideInset)

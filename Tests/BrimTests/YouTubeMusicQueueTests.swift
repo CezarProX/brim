@@ -226,6 +226,15 @@ struct YouTubeMusicBrowserQueueTests {
     #expect(compiled, "\(error?[NSAppleScript.errorMessage] ?? "")")
   }
 
+  /// "Every window/tab" must carry a real absolute-ordinal selector: a null one made Chrome answer
+  /// -1700, so the queue was never read from the page (seen live).
+  @Test func everyElementSpecifierHasAnAllOrdinal() {
+    let specifier = NowPlayingBrowser.all("cwin")
+    let selector = specifier.forKeyword(NowPlayingAppleEvents.code("seld"))
+    #expect(selector?.descriptorType == NowPlayingAppleEvents.code("abso"))
+    #expect(selector?.typeCodeValue == NowPlayingAppleEvents.code("all "))
+  }
+
   @Test func safariTabScriptCompiles() {
     let source = YouTubeMusicQueueReader.browserScript(for: .youtubeSafari, javaScript: YouTubeMusicQueueReader.browserReadScript)
     var error: NSDictionary?

@@ -15,69 +15,11 @@ CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
-# Resolve a stable identity before replacing the existing build. An ad-hoc
-# signature changes the app's designated requirement on every changed build.
-SIGN_IDENTITY=""
-REQUESTED_IDENTITY="${BRIM_SIGNING_IDENTITY:-}"
-LOCAL_SIGNING_DIR="$HOME/Library/Application Support/Brim/DevelopmentSigning"
-LOCAL_KEYCHAIN=""
-LOCAL_REQUIREMENT=""
-# Keep an existing local development identity stable even if a new Apple
-# certificate appears later. An explicit identity override takes precedence.
-if [[ "${BRIM_PUBLIC_RELEASE_ADHOC:-0}" == "1" ]]; then
-    if [[ -n "$REQUESTED_IDENTITY" ]]; then
-        echo "error: choose BRIM_PUBLIC_RELEASE_ADHOC or BRIM_SIGNING_IDENTITY, not both." >&2
-        exit 1
-    fi
-    SIGN_IDENTITY="-"
-elif [[ -z "$REQUESTED_IDENTITY" && -d "$LOCAL_SIGNING_DIR" ]]; then
-    if [[ "$(stat -f '%Lp' "$LOCAL_SIGNING_DIR")" != "700" ]]; then
-        echo "error: the local signing directory must have permissions 700." >&2
-        exit 1
-    fi
-    for local_file in signing.keychain-db certificate.der keychain-password; do
-        if [[ ! -f "$LOCAL_SIGNING_DIR/$local_file" || -L "$LOCAL_SIGNING_DIR/$local_file" || "$(stat -f '%Lp' "$LOCAL_SIGNING_DIR/$local_file")" != "600" ]]; then
-            echo "error: local signing files are missing or must have permissions 600." >&2
-            exit 1
-        fi
-    done
-    # Certificate fingerprint pins the exact private-key identity; never use
-    # an identifier-only requirement or add the certificate to system trust.
-    SIGN_IDENTITY="$(shasum -a 1 "$LOCAL_SIGNING_DIR/certificate.der" | awk '{print $1}')"
-    LOCAL_KEYCHAIN="$LOCAL_SIGNING_DIR/signing.keychain-db"
-    LOCAL_REQUIREMENT="designated => identifier \"io.github.cezarprox.brim\" and certificate leaf = H\"$SIGN_IDENTITY\""
-else
-VALID_IDENTITIES="$(security find-identity -v -p codesigning)"
-IDENTITY_PATTERN='^[[:space:]]*[0-9]+\)[[:space:]]+([[:xdigit:]]{40})[[:space:]]+"([^"]+)"'
-while IFS= read -r identity_line; do
-    if [[ "$identity_line" =~ $IDENTITY_PATTERN ]]; then
-        identity_hash="${BASH_REMATCH[1]}"
-        identity_name="${BASH_REMATCH[2]}"
-        if [[ -n "$REQUESTED_IDENTITY" ]]; then
-            if [[ "$REQUESTED_IDENTITY" == "$identity_name" || "$REQUESTED_IDENTITY" == "$identity_hash" ]]; then
-                SIGN_IDENTITY="$identity_hash"
-                break
-            fi
-        elif [[ "$identity_name" == "Apple Development: "* ]]; then
-            SIGN_IDENTITY="$identity_hash"
-            break
-        fi
-    fi
-done <<< "$VALID_IDENTITIES"
-fi
-
-if [[ -n "$REQUESTED_IDENTITY" && -z "$SIGN_IDENTITY" ]]; then
-    echo "error: BRIM_SIGNING_IDENTITY must name a valid code-signing identity or its exact certificate hash." >&2
-    exit 1
-fi
-if [[ -z "$SIGN_IDENTITY" ]]; then
-    if [[ "${BRIM_ALLOW_ADHOC:-0}" != "1" ]]; then
-        echo "error: no valid Apple Development signing identity. Renew it in Xcode or set BRIM_SIGNING_IDENTITY." >&2
-        echo "For temporary ad-hoc testing only, set BRIM_ALLOW_ADHOC=1; rebuilt apps may need permission again." >&2
-        exit 1
-    fi
-    SIGN_IDENTITY="-"
-fi
+# Validate the existing pinned identity before touching the previous app bundle.
+"$SCRIPT_DIR/scripts/sign_app.sh" --check
+source "$SCRIPT_DIR/scripts/signing-policy.conf"
+SOURCE_BUNDLE="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$SCRIPT_DIR/Resources/Info.plist")"
+[[ "$SOURCE_BUNDLE" == "$BRIM_BUNDLE_ID" ]] || { echo "error: bundle identifier differs from signing policy." >&2; exit 1; }
 
 echo "==> Building $APP_NAME (release)..."
 swift build --disable-keychain -c release
@@ -134,68 +76,9 @@ echo "==> Building the MediaRemote helper..."
 HELPER_DIR="$SCRIPT_DIR/Resources/MediaRemoteHelper"
 clang -dynamiclib -fobjc-arc -O2 -arch arm64 -arch x86_64 -framework Foundation \
     -o "$RESOURCES_DIR/BrimMediaRemote.dylib" "$HELPER_DIR/BrimMediaRemote.m"
-codesign --force --sign - "$RESOURCES_DIR/BrimMediaRemote.dylib"
 cp "$HELPER_DIR/brim-mediaremote.pl" "$RESOURCES_DIR/brim-mediaremote.pl"
 
-SIGN_ARGS=(--timestamp=none)
-if [[ -n "$LOCAL_KEYCHAIN" ]]; then
-    echo "==> Signing with the existing local development certificate."
-    # codesign's certificate resolution also consults the search list. Add this
-    # isolated keychain only for signing; do not change certificate trust.
-    signing_keychains=()
-    local_keychain_was_listed=0
-    signing_keychain_list="$(security list-keychains -d user)"
-    while IFS= read -r entry; do
-        signing_keychains+=("$entry")
-        if [[ "$entry" == "$LOCAL_KEYCHAIN" ]]; then local_keychain_was_listed=1; fi
-    done < <(printf '%s\n' "$signing_keychain_list" | sed 's/^ *"//;s/"$//')
-    cleanup_local_signing() {
-        security lock-keychain "$LOCAL_KEYCHAIN" >/dev/null 2>&1 || true
-        if [[ "$local_keychain_was_listed" == "0" ]]; then
-            if ! remaining_keychain_list="$(security list-keychains -d user)"; then
-                echo "warning: could not read the keychain search list; leaving it unchanged." >&2
-                return 1
-            fi
-            remaining_keychains=()
-            while IFS= read -r entry; do
-                if [[ "$entry" != "$LOCAL_KEYCHAIN" ]]; then remaining_keychains+=("$entry"); fi
-            done < <(printf '%s\n' "$remaining_keychain_list" | sed 's/^ *"//;s/"$//')
-            security list-keychains -d user -s "${remaining_keychains[@]}"
-        fi
-    }
-    trap cleanup_local_signing EXIT
-    if [[ "$local_keychain_was_listed" == "0" ]]; then
-        security list-keychains -d user -s "${signing_keychains[@]}" "$LOCAL_KEYCHAIN"
-    fi
-    security unlock-keychain -p "$(cat "$LOCAL_SIGNING_DIR/keychain-password")" "$LOCAL_KEYCHAIN"
-    SIGN_ARGS=(--options runtime --timestamp=none --keychain "$LOCAL_KEYCHAIN")
-elif [[ "$SIGN_IDENTITY" == "-" ]]; then
-    echo "==> Explicit ad-hoc build; privacy permissions may not survive rebuilding."
-else
-    echo "==> Code signing with: $SIGN_IDENTITY"
-    SIGN_ARGS=(--options runtime)
-fi
-# Sign nested Sparkle code from the inside out. Preserve its own sandbox entitlements;
-# Brim's entitlements and local designated requirement apply only to the outer app.
-EMBEDDED_SPARKLE="$CONTENTS_DIR/Frameworks/Sparkle.framework"
-SPARKLE_VERSION="$EMBEDDED_SPARKLE/Versions/Current"
-for nested_code in \
-    "$SPARKLE_VERSION/Autoupdate" \
-    "$SPARKLE_VERSION/Updater.app" \
-    "$SPARKLE_VERSION/XPCServices/Downloader.xpc" \
-    "$SPARKLE_VERSION/XPCServices/Installer.xpc" \
-    "$EMBEDDED_SPARKLE"; do
-    codesign --force "${SIGN_ARGS[@]}" --preserve-metadata=entitlements \
-        --sign "$SIGN_IDENTITY" "$nested_code"
-done
-if [[ -n "$LOCAL_REQUIREMENT" ]]; then
-    codesign --force "${SIGN_ARGS[@]}" --requirements "=$LOCAL_REQUIREMENT" \
-        --entitlements "$SCRIPT_DIR/Resources/Brim.entitlements" --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
-else
-    codesign --force "${SIGN_ARGS[@]}" --entitlements "$SCRIPT_DIR/Resources/Brim.entitlements" \
-        --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
-fi
-codesign --verify --deep --strict "$APP_BUNDLE"
+"$SCRIPT_DIR/scripts/sign_app.sh" "$APP_BUNDLE"
 
 echo ""
 echo "Build succeeded: $APP_BUNDLE"

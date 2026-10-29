@@ -25,6 +25,15 @@ enum ClaudeHookSettings {
     "'" + executable.replacingOccurrences(of: "'", with: "'\\''") + "' " + marker
   }
 
+  /// The executable a Brim hook command runs, undoing `command(executable:)`'s quoting.
+  static func executable(in command: String) -> String? {
+    let suffix = " " + marker
+    guard command.hasSuffix(suffix) else { return nil }
+    let quoted = command.dropLast(suffix.count)
+    guard quoted.count >= 2, quoted.hasPrefix("'"), quoted.hasSuffix("'") else { return nil }
+    return String(quoted.dropFirst().dropLast()).replacingOccurrences(of: "'\\''", with: "'")
+  }
+
   private static func entries(command: String) -> [(event: String, matcher: String?, timeout: Int, summary: String)] {
     [
       ("PreToolUse", "AskUserQuestion", questionTimeout, "PreToolUse (AskUserQuestion): answer Claude's questions from the island"),
@@ -32,7 +41,9 @@ enum ClaudeHookSettings {
     ]
   }
 
-  static func merge(existing: Data?, command: String) throws -> Result {
+  /// `executableExists` decides whether a hook naming another copy of Brim still works: any copy can
+  /// relay over the socket, so only a hook whose binary is gone is re-pointed at `command`.
+  static func merge(existing: Data?, command: String, executableExists: (String) -> Bool = { _ in false }) throws -> Result {
     var root: [String: Any] = [:]
     if let existing, !existing.allSatisfy({ $0 == 0x20 || $0 == 0x0A || $0 == 0x0D || $0 == 0x09 }) {
       guard let object = (try? JSONSerialization.jsonObject(with: existing)) as? [String: Any] else { throw MergeError.notAnObject }
@@ -54,7 +65,7 @@ enum ClaudeHookSettings {
       if groups.contains(where: { containsMarker($0) }) {
         // Already there. If an older or moved copy of the app put it there, point it at this one in
         // place instead of adding a duplicate.
-        guard groups.contains(where: { containsMarker($0) && !contains(command, in: $0) }) else { continue }
+        guard groups.contains(where: { containsMarker($0) && !works($0, command, executableExists) }) else { continue }
         hooks[entry.event] = groups.map { containsMarker($0) ? repoint($0, to: command) : $0 }
         additions.append(entry.summary)
         repointed = true
@@ -87,6 +98,12 @@ enum ClaudeHookSettings {
     ((group["hooks"] as? [[String: Any]]) ?? []).contains { ($0["command"] as? String) == command }
   }
 
+  private static func works(_ group: [String: Any], _ command: String, _ executableExists: (String) -> Bool) -> Bool {
+    contains(command, in: group) || ((group["hooks"] as? [[String: Any]]) ?? []).contains { hook in
+      (hook["command"] as? String).flatMap(executable(in:)).map(executableExists) == true
+    }
+  }
+
   /// Removes only the entries Brim added.
   static func remove(from existing: Data) throws -> Data {
     guard var root = (try? JSONSerialization.jsonObject(with: existing)) as? [String: Any] else { throw MergeError.notAnObject }
@@ -101,14 +118,14 @@ enum ClaudeHookSettings {
   }
 
   /// Whether both hooks are present. With `command`, they must also run exactly that command, so a
-  /// hook left pointing at an old copy of the app counts as not installed.
-  static func isInstalled(in data: Data?, command: String? = nil) -> Bool {
+  /// hook left pointing at a copy of the app that no longer exists counts as not installed.
+  static func isInstalled(in data: Data?, command: String? = nil, executableExists: (String) -> Bool = { _ in false }) -> Bool {
     guard let data, let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
       let hooks = root["hooks"] as? [String: Any]
     else { return false }
     return ["PreToolUse", "PermissionRequest"].allSatisfy { event in
       ((hooks[event] as? [[String: Any]]) ?? []).contains { group in
-        containsMarker(group) && (command.map { contains($0, in: group) } ?? true)
+        containsMarker(group) && (command.map { works(group, $0, executableExists) } ?? true)
       }
     }
   }
@@ -125,11 +142,12 @@ enum ClaudeHookSettings {
 
   /// Writes the merged file after copying the old one next to it. Only called after the user confirms.
   @discardableResult
-  static func install(at requested: URL = settingsURL, command: String, now: Date = Date()) throws -> (backup: URL?, result: Result) {
+  static func install(at requested: URL = settingsURL, command: String, now: Date = Date(),
+                      executableExists: (String) -> Bool = { _ in false }) throws -> (backup: URL?, result: Result) {
     let fm = FileManager.default
     let url = requested.resolvingSymlinksInPath()
     let existing = fm.contents(atPath: url.path)
-    let result = try merge(existing: existing, command: command)
+    let result = try merge(existing: existing, command: command, executableExists: executableExists)
     guard result.changed else { return (nil, result) }
     try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     var backup: URL?

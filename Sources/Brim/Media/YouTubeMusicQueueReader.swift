@@ -23,7 +23,7 @@ enum YouTubeMusicQueueReader {
         case .youtubeApp:
             // The app is a Chrome app window: page scripting reads its real queue. Without it (Chrome's
             // "Allow JavaScript from Apple Events" off) the list comes from the accessibility tree.
-            if let output = try? await MusicQueueReader.run(browserScript(for: snapshot.source, javaScript: browserReadScript)) {
+            if let output = try? await runInTabs(for: snapshot.source, javaScript: browserReadScript) {
                 let rows = YouTubeQueueParsing.browserUpcoming(output, title: snapshot.title, artist: snapshot.artist, limit: limit)
                 if !rows.isEmpty { return YouTubeQueueParsing.items(rows) }
             }
@@ -34,7 +34,7 @@ enum YouTubeMusicQueueReader {
             }
             return YouTubeQueueParsing.items(rows)
         case .youtubeChrome, .youtubeSafari:
-            let output = try await MusicQueueReader.run(browserScript(for: snapshot.source, javaScript: browserReadScript))
+            let output = try await runInTabs(for: snapshot.source, javaScript: browserReadScript)
             return YouTubeQueueParsing.items(YouTubeQueueParsing.browserUpcoming(
                 output, title: snapshot.title, artist: snapshot.artist, limit: limit))
         case .music, .spotify:
@@ -48,8 +48,8 @@ enum YouTubeMusicQueueReader {
         case .youtubeApp, .youtubeChrome, .youtubeSafari:
             // Not an accessibility press: the app's row buttons only show on hover, and pressing them
             // through accessibility reports success while doing nothing (checked on the live app).
-            let output = try await MusicQueueReader.run(browserScript(for: snapshot.source, javaScript: try browserPlayScript(
-                item: item, current: snapshot)))
+            let output = try await runInTabs(for: snapshot.source, javaScript: try browserPlayScript(
+                item: item, current: snapshot))
             guard output.split(whereSeparator: \.isNewline).contains("ok") else { throw NowPlayingFailure.unavailable("The queued song is no longer listed.") }
         case .music, .spotify:
             throw NowPlayingFailure.unavailable("This player has no YouTube Music queue.")
@@ -228,7 +228,16 @@ enum YouTubeMusicQueueReader {
         """
     }
 
-    /// Runs `javaScript` in every music.youtube.com tab, one result per line.
+    /// Runs `javaScript` in the music.youtube.com tabs of the source's browser, one result per line.
+    /// Chrome (and the YouTube Music app, a Chrome app window) is addressed per process, so another
+    /// Chrome instance running beside the user's can't take the request.
+    static func runInTabs(for source: NowPlayingSource, javaScript: String) async throws -> String {
+        source == .youtubeSafari
+            ? try await MusicQueueReader.run(browserScript(for: source, javaScript: javaScript))
+            : try await ChromeTabScripting.run(javaScript)
+    }
+
+    /// Runs `javaScript` in every music.youtube.com tab, one result per line (Safari's path).
     static func browserScript(for source: NowPlayingSource, javaScript: String) -> String {
         // The YouTube Music app is a Chrome app window, so Chrome's scripting reaches its page too.
         let chrome = source != .youtubeSafari

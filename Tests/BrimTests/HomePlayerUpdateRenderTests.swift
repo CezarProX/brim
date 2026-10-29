@@ -7,7 +7,7 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct HomePlayerUpdateRenderTests {
-    @Test func homePlayerAndFullPlayerRenderWithVolume() async throws {
+    @Test func homeKeepsVolumeAndMusicTabHasNoVolumeRow() async throws {
         let playing = await OnboardingSamples.nowPlaying()
         let volume = PlayerVolumeModel(read: { .init(level: 0.65, muted: false) }, write: { _ in true })
         let root = VStack(alignment: .leading, spacing: 20) {
@@ -20,7 +20,7 @@ struct HomePlayerUpdateRenderTests {
             }
             Text("Music").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
             MusicPlayerCard(model: playing, queue: PlayingNextModel(read: { _ in "" }, perform: { _ in "" },
-                             fetchArtwork: { _ in nil }), topInset: 16, volumeModel: volume, showsQueue: .constant(false))
+                             fetchArtwork: { _ in nil }), topInset: 16, showsQueue: .constant(false))
         }
         .padding(24)
         .frame(width: 520, height: 480, alignment: .topLeading)
@@ -42,7 +42,7 @@ struct HomePlayerUpdateRenderTests {
         let png = try #require(bitmap.representation(using: .png, properties: [:]))
         let rootURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let output = rootURL.appendingPathComponent(".context/home-music-1.0.3.png")
+        let output = rootURL.appendingPathComponent(".context/home-music-volume-home-only.png")
         try png.write(to: output)
         #expect(bitmap.pixelsWide > 500)
     }

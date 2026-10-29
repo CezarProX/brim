@@ -12,14 +12,14 @@ extension YouTubeMusicQueueReader {
         guard snapshot.source != .music, snapshot.source != .spotify else {
             throw NowPlayingFailure.unavailable("This player has no YouTube Music queue.")
         }
-        let opened = try await MusicQueueReader.run(browserScript(
-            for: snapshot.source, javaScript: try openMenuScript(title: item.title, current: snapshot.title)))
+        let opened = try await runInTabs(
+            for: snapshot.source, javaScript: try openMenuScript(title: item.title, current: snapshot.title))
         guard lines(opened).contains("opened") else {
             throw NowPlayingFailure.unavailable("The queued song is no longer listed.")
         }
         try await Task.sleep(for: menuSettle)
-        let chosen = try await MusicQueueReader.run(browserScript(
-            for: snapshot.source, javaScript: try choosePlayNextScript(current: snapshot.title)))
+        let chosen = try await runInTabs(
+            for: snapshot.source, javaScript: try choosePlayNextScript(current: snapshot.title))
         guard lines(chosen).contains("ok") else {
             throw NowPlayingFailure.unavailable("YouTube Music did not offer Play next for this song.")
         }

@@ -349,6 +349,20 @@ struct AgentHookSettingsTests {
     #expect(!(try ClaudeHookSettings.merge(existing: result.data, command: command)).changed)
   }
 
+  /// Any Brim binary can relay to the running app over the socket, so a hook naming another copy that
+  /// still exists (a dev build beside /Applications) must not be re-pointed on every launch or update.
+  @Test func keepsAHookThatPointsAtAnotherCopyThatStillExists() throws {
+    let other = "/Users/me/it's build/Brim.app/Contents/MacOS/Brim"
+    let existing = try ClaudeHookSettings.merge(existing: nil, command: ClaudeHookSettings.command(executable: other)).data
+    let exists: (String) -> Bool = { $0 == other }
+    #expect(ClaudeHookSettings.isInstalled(in: existing, command: command, executableExists: exists))
+    #expect(!(try ClaudeHookSettings.merge(existing: existing, command: command, executableExists: exists)).changed)
+    let gone = try ClaudeHookSettings.merge(existing: existing, command: command, executableExists: { _ in false })
+    #expect(gone.changed && gone.repointed)
+    #expect(ClaudeHookSettings.executable(in: ClaudeHookSettings.command(executable: other)) == other)
+    #expect(ClaudeHookSettings.executable(in: "echo hi") == nil)
+  }
+
   @Test func freshInstallIsNotARepoint() throws {
     #expect(!(try ClaudeHookSettings.merge(existing: nil, command: command)).repointed)
   }

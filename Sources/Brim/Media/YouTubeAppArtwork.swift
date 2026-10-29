@@ -49,8 +49,8 @@ enum YouTubeAppArtwork {
             var found: String?
             for attempt in 1...attempts where found == nil {
                 if attempt > 1 { try await Task.sleep(for: attemptGap) }
-                let output = try await MusicQueueReader.run(YouTubeMusicQueueReader.browserScript(
-                    for: .youtubeApp, javaScript: try script(title: title)))
+                let output = try await YouTubeMusicQueueReader.runInTabs(
+                    for: .youtubeApp, javaScript: try script(title: title))
                 found = output.split(whereSeparator: \.isNewline).map(String.init)
                     .first { NowPlayingSnapshot.safeArtworkURL($0) != nil }
             }

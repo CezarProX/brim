@@ -73,6 +73,9 @@ final class NowPlayingModel: ObservableObject {
     private var demoOriginal: DemoOriginal?
     /// True while the event-driven helper is delivering, so polling can relax.
     private(set) var streamAlive = false
+    /// The system session still being reported by the helper. Supplemental app reads can fail
+    /// without ending it; only a system handoff, helper failure or player exit does that.
+    private var streamedSource: NowPlayingSource?
     /// Empty reads in a row. The player clears only on the second, so a hiccup between songs
     /// (or a page mid-navigation) does not blink the island empty.
     private var emptyReads = 0
@@ -127,6 +130,7 @@ final class NowPlayingModel: ObservableObject {
         pollingTask = nil
         stream?.stop()
         streamAlive = false
+        streamedSource = nil
         deadlineTask?.cancel()
         nudgeTask?.cancel()
         commandChain = nil
@@ -180,6 +184,7 @@ final class NowPlayingModel: ObservableObject {
         enabledSources.removeAll { $0 == source }
         fixedSources?.removeAll { $0 == source }
         sourceStatus.removeValue(forKey: source)
+        if streamedSource == source { streamedSource = nil }
         persist(enabledSources)
         if track?.snapshot.source == source { ingest(nil, anchor: Date()) }
         status = Self.idleStatus
@@ -231,25 +236,37 @@ final class NowPlayingModel: ObservableObject {
         guard startedAt >= lastCommandIssuedAt else { return }
         if let rawSelected, isLaggingAppPoll(rawSelected) { return }
         let selected = rawSelected.map(reconcilingPoll)
+        let keepsStreamTrack = shouldKeepStreamTrack(over: selected, running: sources)
         // A player that quit is certainly gone; only a still-running one gets the second look.
-        if selected == nil, failures.isEmpty, !sources.isEmpty, observed != nil, emptyReads == 0 {
+        if !keepsStreamTrack, selected == nil, failures.isEmpty, !sources.isEmpty, observed != nil, emptyReads == 0 {
             emptyReads = 1
             return
         }
         emptyReads = 0
-        ingest(selected, anchor: Date())
-        if let selected { remember(selected) }
-        else if let pendingLast, lastPlayed != pendingLast {
-            // The player went away: Recently Played resumes from where it last was.
-            lastPlayed = pendingLast
-            persist(pendingLast)
+        // Keep the stream's original time anchor too: re-ingesting its old elapsed time here
+        // would restart the progress clock on every failed poll.
+        if !keepsStreamTrack {
+            ingest(selected, anchor: Date())
+            if let selected { remember(selected) }
+            else if let pendingLast, lastPlayed != pendingLast {
+                // The player went away: Recently Played resumes from where it last was.
+                lastPlayed = pendingLast
+                persist(pendingLast)
+            }
         }
-        if selected != nil { nextAccessSource = nil }
+        let hasSong = selected != nil || keepsStreamTrack
+        if hasSong { nextAccessSource = nil }
         if accessSource != nextAccessSource { accessSource = nextAccessSource }
         if sourceStatus != nextSourceStatus { sourceStatus = nextSourceStatus }
-        let nextStatus = commandError ?? (selected == nil
+        let nextStatus = commandError ?? (!hasSong
             ? (failures.first ?? "Nothing playing. Start a song — Brim detects it automatically.") : "")
         if status != nextStatus { status = nextStatus }
+    }
+
+    private func shouldKeepStreamTrack(over poll: NowPlayingSnapshot?, running sources: [NowPlayingSource]) -> Bool {
+        guard let streamedSource, let observed, observed.source == streamedSource,
+              sources.contains(streamedSource) else { return false }
+        return poll == nil || (observed.isPlaying && poll?.source != streamedSource)
     }
 
     /// Keeps the song for Recently Played. Position is tracked privately and published only when the
@@ -500,15 +517,19 @@ final class NowPlayingModel: ObservableObject {
         switch message {
         case .unavailable:
             streamAlive = false
+            streamedSource = nil
         case .reply:
             break
         case .none:
             streamAlive = true
+            streamedSource = nil
             refresh()
         case .nowPlaying(let payload):
             streamAlive = true
+            streamedSource = nil
             guard let source = MediaRemoteStreamMessage.Payload.source(forBundle: payload.bundle),
                   fixedSources?.contains(source) ?? true else { refresh(); return }
+            streamedSource = source
             if !enabledSources.contains(source) { enabledSources.append(source) }
             let snapshot = keepingArtwork(payload.snapshot(source: source, previous: observed))
             let songChanged = observed.map { OptimisticPlayback.key($0) != OptimisticPlayback.key(snapshot) } ?? true

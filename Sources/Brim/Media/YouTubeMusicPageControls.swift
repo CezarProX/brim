@@ -6,8 +6,8 @@ import Foundation
 /// The page's Media Session always names the playing song, so that is what this checks.
 extension YouTubeMusicQueueReader {
     static func pressTransport(_ command: NowPlayingCommand, expected: NowPlayingSnapshot) async throws {
-        let output = try await MusicQueueReader.run(browserScript(
-            for: expected.source, javaScript: try transportScript(command, current: expected.title)))
+        let output = try await runInTabs(
+            for: expected.source, javaScript: try transportScript(command, current: expected.title))
         guard output.split(whereSeparator: \.isNewline).contains("ok") else {
             throw NowPlayingFailure.unavailable("The song changed. Try the control again.")
         }

@@ -8,10 +8,16 @@ enum ClaudeHookInstallFlow {
   static var executable: String { Bundle.main.executablePath ?? "/Applications/Brim.app/Contents/MacOS/Brim" }
   static var command: String { ClaudeHookSettings.command(executable: executable) }
 
-  /// Installed and pointing at this copy of the app. A hook left by a moved or renamed build counts
-  /// as missing, so the Agents app offers to fix it.
+  /// Any existing Brim binary can relay to the running app, so a hook naming another copy (a dev
+  /// build beside /Applications) is left alone; only one whose binary is gone gets re-pointed.
+  static let executableExists: (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+
+  /// Installed and pointing at a copy of the app that still exists. A hook left by a deleted or
+  /// moved build counts as missing, so the Agents app offers to fix it.
   static var isInstalled: Bool {
-    ClaudeHookSettings.isInstalled(in: FileManager.default.contents(atPath: ClaudeHookSettings.settingsURL.path), command: command)
+    ClaudeHookSettings.isInstalled(
+      in: FileManager.default.contents(atPath: ClaudeHookSettings.settingsURL.path), command: command,
+      executableExists: executableExists)
   }
 
   /// The snippet merged into the file, for the confirmation dialog.
@@ -55,7 +61,7 @@ enum ClaudeHookInstallFlow {
     let url = ClaudeHookSettings.settingsURL
     let existing = FileManager.default.contents(atPath: url.path)
     let merged: ClaudeHookSettings.Result
-    do { merged = try ClaudeHookSettings.merge(existing: existing, command: command) } catch {
+    do { merged = try ClaudeHookSettings.merge(existing: existing, command: command, executableExists: executableExists) } catch {
       notify(L10n.tr("Brim couldn’t read your Claude Code settings"),
              L10n.tr("~/.claude/settings.json isn’t valid JSON, so Brim left it alone. Fix or remove the file, then try again."))
       return false
@@ -67,7 +73,7 @@ enum ClaudeHookInstallFlow {
     let details = preview(existing: existing, command: command) ?? ""
     guard BrimDialog.run(confirmation(details: details, repointing: merged.repointed)) else { return false }
     do {
-      let done = try ClaudeHookSettings.install(command: command)
+      let done = try ClaudeHookSettings.install(command: command, executableExists: executableExists)
       let saved = done.backup.map { L10n.tr("Your previous settings were saved as %@.", $0.lastPathComponent) }
         ?? L10n.tr("Created ~/.claude/settings.json.")
       notify(L10n.tr("Brim now answers Claude Code"), L10n.tr("New questions from Claude Code appear in the notch.") + " " + saved)

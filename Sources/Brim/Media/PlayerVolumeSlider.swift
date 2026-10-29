@@ -37,7 +37,7 @@ final class PlayerVolumeModel: ObservableObject {
     }
 }
 
-/// The same output-volume row in Home and the full player. Hardware changes are read back;
+/// The Home Media widget's output-volume row. Hardware changes are read back;
 /// unsupported HDMI/AirPlay outputs show an unavailable control rather than a fake volume.
 @MainActor
 struct PlayerVolumeSlider: View {

@@ -44,9 +44,13 @@ struct DynamicGlassShellBackdrop: View {
           // Closed, the island is solid black like the hardware notch. Over the glass, so the shell
           // is never see-through: it thins out as the island opens and goes black at once on close,
           // because the AppKit blur only covers the closed frame while the shell shrinks around it.
+          // The fade is scoped to opacity: on the whole view it also drove the frame, so the black
+          // snapped to the pill's size as a square-cornered slab inside the closing shell. Closing
+          // has no fade: any see-through frame shows the blur already shrunk to the closed size.
           Color.black
-            .opacity(expanded ? 0 : 1)
-            .animation(expanded ? .easeInOut(duration: 0.3) : .easeOut(duration: 0.1), value: expanded)
+            .animation(expanded ? .easeInOut(duration: 0.3) : nil) {
+              $0.opacity(expanded ? 0 : 1)
+            }
         } else {
           Color.black
         }
