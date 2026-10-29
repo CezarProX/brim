@@ -72,8 +72,10 @@ struct HomeRemoveBadge: View {
       Image(systemName: "minus").font(.system(size: 9, weight: .black)).foregroundStyle(.white)
         .frame(width: 18, height: 18).background(Color.red, in: Circle())
         .overlay { Circle().strokeBorder(.black.opacity(0.25), lineWidth: 0.5) }
+        .frame(width: 28, height: 28)
+        .contentShape(Rectangle())
     }
-    .buttonStyle(IslandPressStyle(pressedScale: 0.8))
+    .buttonStyle(IslandPressStyle(pressedScale: 0.95))
     .accessibilityLabel("Remove \(title)")
   }
 }
@@ -93,8 +95,10 @@ struct HomeResizeHandle: View {
         .font(.system(size: 9, weight: .bold)).foregroundStyle(.black)
         .frame(width: 20, height: 20).background(Color.white, in: Circle())
         .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+        .frame(width: 28, height: 28)
+        .contentShape(Rectangle())
     }
-    .buttonStyle(IslandPressStyle(pressedScale: 0.8))
+    .buttonStyle(IslandPressStyle(pressedScale: 0.95))
     .disabled(!enabled)
     .opacity(enabled ? 1 : 0.4)
     .help(grows ? "Make \(title) larger" : "Make \(title) smaller")

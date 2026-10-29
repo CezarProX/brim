@@ -71,8 +71,10 @@ struct NowPlayingSnapshot: Sendable, Equatable {
     /// nil when the player doesn't expose it.
     let isFavorite: Bool?
     let isShuffling: Bool?
-    /// The YouTube Music watch page (song and playlist), so a closed player can be resumed there.
+    /// A validated source-specific track link; YouTube keeps its watch page and playlist.
     var pageURL: String?
+    /// The real artist page when the player exposes one; absent IDs use a service search.
+    var artistURL: String?
     /// 1 while playing at normal speed, 0 paused; MediaRemote reports it with the elapsed time.
     var playbackRate: Double = 1
     /// nil when the player doesn't expose repeat (YouTube Music).
@@ -129,12 +131,17 @@ struct NowPlayingSnapshot: Sendable, Equatable {
             let position: Double
             let isPlaying: Bool
             let artworkURL: String?
+            let pageURL: String?
+            let artistURL: String?
         }
         guard let metadata = try JSONDecoder().decode(Metadata?.self, from: Data(json.utf8)),
               !metadata.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        return Self(source: source, title: metadata.title, artist: metadata.artist, album: metadata.album,
-                    duration: metadata.duration, position: metadata.position, isPlaying: metadata.isPlaying,
-                    artworkURL: metadata.artworkURL)
+        var snapshot = Self(source: source, title: metadata.title, artist: metadata.artist, album: metadata.album,
+                            duration: metadata.duration, position: metadata.position, isPlaying: metadata.isPlaying,
+                            artworkURL: metadata.artworkURL)
+        snapshot.pageURL = metadata.pageURL.flatMap { NowPlayingNavigation.safeTrackURL($0, source: source)?.absoluteString }
+        snapshot.artistURL = metadata.artistURL.flatMap { NowPlayingNavigation.safeArtistURL($0, source: source)?.absoluteString }
+        return snapshot
     }
 }
 

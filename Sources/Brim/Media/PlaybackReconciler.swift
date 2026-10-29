@@ -185,6 +185,7 @@ extension NowPlayingSnapshot {
             artworkData: artworkData ?? self.artworkData, artworkURL: artworkURL, albumURL: albumURL,
             isFavorite: isFavorite ?? self.isFavorite, isShuffling: isShuffling ?? self.isShuffling)
         copy.pageURL = pageURL
+        copy.artistURL = artistURL
         copy.playbackRate = playbackRate
         copy.repeatMode = repeatMode ?? self.repeatMode
         return copy

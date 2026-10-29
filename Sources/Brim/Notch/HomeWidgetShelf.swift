@@ -147,24 +147,6 @@ struct IslandWidgetShelf: View {
           .transition(.opacity)
       }
     }
-    .overlay(alignment: .topLeading) {
-      if editing {
-        HomeRemoveBadge(title: widget.title) { withAnimation(motion) { layout.toggle(widget) } }
-          .offset(x: -9, y: -9)
-          .transition(.scale.combined(with: .opacity))
-      }
-    }
-    .overlay(alignment: .bottomTrailing) {
-      if editing, widget.sizes.count > 1 {
-        let target: HomeWidgetSize = item.size == .small ? .medium : .small
-        HomeResizeHandle(title: widget.title, grows: target > item.size,
-                         enabled: layout.canResize(widget, to: target)) {
-          withAnimation(motion) { layout.setSize(widget, target) }
-        }
-        .offset(x: 9, y: 9)
-        .transition(.scale.combined(with: .opacity))
-      }
-    }
     .modifier(HomeJiggle(active: editing && !reduceMotion && drag?.widget != widget, seed: widget.rawValue.count))
     .contentShape(Rectangle())
     .reportsHomeWidgetFrame(widget)
@@ -177,6 +159,26 @@ struct IslandWidgetShelf: View {
       if !layout.isEditing { beginEditing() }
     })
     .contextMenu { if !editing { contextMenu(item) } }
+    // Controls are outside the wobble/drag gesture subtree and inside the card's hit bounds.
+    // Previously the circles straddled the bounds and inherited the reorder gesture.
+    .overlay(alignment: .topLeading) {
+      if editing, !isLifted(widget) {
+        HomeRemoveBadge(title: widget.title) { withAnimation(motion) { layout.toggle(widget) } }
+          .padding(2)
+          .transition(.opacity)
+      }
+    }
+    .overlay(alignment: .bottomTrailing) {
+      if editing, !isLifted(widget), widget.sizes.count > 1 {
+        let target: HomeWidgetSize = item.size == .small ? .medium : .small
+        HomeResizeHandle(title: widget.title, grows: target > item.size,
+                         enabled: layout.canResize(widget, to: target)) {
+          withAnimation(motion) { layout.setSize(widget, target) }
+        }
+        .padding(2)
+        .transition(.opacity)
+      }
+    }
   }
 
   /// Right-click on a widget: its sizes (as iOS's long-press menu), editing and removal.

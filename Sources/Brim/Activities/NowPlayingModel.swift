@@ -47,6 +47,7 @@ final class NowPlayingModel: ObservableObject {
 
     private var provider: any NowPlayingProviding
     private let persist: ([NowPlayingSource]) -> Void
+    private let navigate: (NowPlayingSnapshot, NowPlayingNavigation.Target) async throws -> Void
     private var fixedSources: [NowPlayingSource]?
     private var pollingTask: Task<Void, Never>?
     private var artworkTask: Task<Void, Never>?
@@ -82,7 +83,9 @@ final class NowPlayingModel: ObservableObject {
          artworkNow: @escaping () -> Date = Date.init,
          resumeStore: NowPlayingResume.Store = .ephemeral,
          stream: MediaRemoteStreamClient? = NowPlayingMediaRemote.stream,
-         idlePlay: NowPlayingIdlePlay.Actions? = nil) {
+         idlePlay: NowPlayingIdlePlay.Actions? = nil,
+         navigate: ((NowPlayingSnapshot, NowPlayingNavigation.Target) async throws -> Void)? = nil) {
+        self.navigate = navigate ?? { try await NowPlayingNavigation.open($0, target: $1) }
         self.stream = stream
         self.idlePlayActions = idlePlay
         self.resumeStore = resumeStore
@@ -365,6 +368,18 @@ final class NowPlayingModel: ObservableObject {
               current.source == expected.source, current.title == expected.title,
               current.artist == expected.artist else { return }
         command(.seek(min(current.duration, max(0, position))))
+    }
+
+    func openTrack() { openNavigation(.track) }
+    func openArtist() { openNavigation(.artist) }
+
+    private func openNavigation(_ target: NowPlayingNavigation.Target) {
+        guard let expected = track?.snapshot else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            do { try await navigate(expected, target) }
+            catch { commandError = error.localizedDescription }
+        }
     }
 
     func openSource() {

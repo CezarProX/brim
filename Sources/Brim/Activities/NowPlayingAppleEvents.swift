@@ -110,6 +110,10 @@ struct NowPlayingAppleEvents {
             album: field("pAlb")?.stringValue ?? "", duration: duration, position: position,
             isPlaying: state == Self.code("kPSP"), artworkData: data, artworkURL: field("aUrl")?.stringValue,
             isFavorite: source == .music ? field("pLov")?.booleanValue : nil, isShuffling: shuffle)
+        if source == .spotify {
+            snapshot.pageURL = [field("spur")?.stringValue, field("ID  ")?.stringValue]
+                .compactMap { $0 }.compactMap { NowPlayingNavigation.safeTrackURL($0, source: source)?.absoluteString }.first
+        }
         snapshot.repeatMode = readRepeat()
         return snapshot
     }

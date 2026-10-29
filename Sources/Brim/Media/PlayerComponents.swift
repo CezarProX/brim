@@ -52,6 +52,8 @@ struct PlayerTitleBlock: View {
     var titleSize: CGFloat = 13.5
     var subtitleSize: CGFloat = 13
     var spacing: CGFloat = 2
+    var onOpenTrack: (() -> Void)?
+    var onOpenArtist: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -60,13 +62,17 @@ struct PlayerTitleBlock: View {
                 RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.18)).frame(width: 96, height: titleSize)
                 RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.1)).frame(width: 64, height: subtitleSize - 2)
             } else {
-                HStack(spacing: 5) {
+                navigationButton(onOpenTrack, label: "Open current song") {
+                  HStack(spacing: 5) {
                     MarqueeText(text: track.title, font: .system(size: titleSize, weight: .semibold),
                                 color: IslandInk.primary, tracking: -0.1)
                     LyricsBadge(size: max(11, titleSize * 0.8))
+                  }
                 }
-                MarqueeText(text: track.artist.isEmpty ? track.sourceName : track.artist,
-                            font: .system(size: subtitleSize), color: IslandInk.secondary)
+                navigationButton(track.artist.isEmpty ? nil : onOpenArtist, label: "Open artist") {
+                  MarqueeText(text: track.artist.isEmpty ? track.sourceName : track.artist,
+                              font: .system(size: subtitleSize), color: IslandInk.secondary)
+                }
             }
         }
         .id(track.isTransitioning ? "skeleton" : track.songKey)
@@ -75,6 +81,17 @@ struct PlayerTitleBlock: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: track.isTransitioning)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    @ViewBuilder private func navigationButton<Content: View>(
+        _ action: (() -> Void)?, label: LocalizedStringKey, @ViewBuilder content: () -> Content
+    ) -> some View {
+        if let action {
+            Button(action: action, label: content).buttonStyle(.plain).accessibilityLabel(label)
+        } else {
+            content()
+        }
+    }
+
 }
 
 /// "1:09 ━━━━━━ -1:24". Position comes from the elapsed-time clock, not from polling.
@@ -195,15 +212,16 @@ struct PlayerTransport: View {
     let track: NowPlayingTrack
     @ObservedObject var model: NowPlayingModel
     var glyph: CGFloat = 21
+    var buttonFrame: CGFloat = 44
     var spacing: CGFloat = 54
 
     var body: some View {
         HStack(spacing: spacing - glyph - 20) {
-            PlayerGlyphButton(symbol: "backward.fill", label: "Previous track", size: glyph, bounce: true,
+            PlayerGlyphButton(symbol: "backward.fill", label: "Previous track", size: glyph, frame: buttonFrame, bounce: true,
                               action: model.previous)
             PlayerGlyphButton(symbol: track.isPlaying ? "pause.fill" : "play.fill",
-                              label: track.isPlaying ? "Pause" : "Play", size: glyph + 4, action: model.playPause)
-            PlayerGlyphButton(symbol: "forward.fill", label: "Next track", size: glyph, bounce: true,
+                              label: track.isPlaying ? "Pause" : "Play", size: glyph + 4, frame: buttonFrame, action: model.playPause)
+            PlayerGlyphButton(symbol: "forward.fill", label: "Next track", size: glyph, frame: buttonFrame, bounce: true,
                               action: model.next)
         }
     }

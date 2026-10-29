@@ -9,10 +9,11 @@ import SwiftUI
 struct HomeIdlePlayerCard: View {
   @ObservedObject var model: NowPlayingModel
   var size: HomeWidgetSize = .medium
+  var volumeModel: PlayerVolumeModel?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    HomeWidgetCard(fill: Color.white.opacity(0.10)) {
+    HomeWidgetCard(fill: Color.white.opacity(0.10), padding: size == .medium ? 10 : 12) {
       if size == .small { small } else { medium }
     }
     .accessibilityElement(children: .contain)
@@ -25,41 +26,47 @@ struct HomeIdlePlayerCard: View {
   }
 
   private var medium: some View {
-    VStack(spacing: 0) {
-      HStack(spacing: 12) {
-        artwork(side: 62)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(title).font(IslandFont.title).foregroundStyle(IslandInk.primary).lineLimit(1)
-          if let artist {
-            Text(artist).font(IslandFont.label).foregroundStyle(IslandInk.secondary).lineLimit(1)
-          }
+    VStack(spacing: 2) {
+      HStack(spacing: 10) {
+        artworkButton(side: 44)
+        if let track = model.track {
+          PlayerTitleBlock(track: track, titleSize: 13.5, subtitleSize: 11.5,
+                           onOpenTrack: model.openTrack, onOpenArtist: model.openArtist)
+        } else {
+          Text(title).font(IslandFont.headline).foregroundStyle(IslandInk.secondary)
         }
         Spacer(minLength: 0)
       }
-      Spacer(minLength: 0)
-      HStack(spacing: 18) {
-        if model.track != nil {
-          transportButton("backward.fill", label: "Previous") { model.previous() }
-        }
-        playButton(side: 34)
-        if model.track != nil {
-          transportButton("forward.fill", label: "Next") { model.next() }
-        }
+      .frame(height: 44)
+      if let track = model.track {
+        PlayerScrubber(track: track, seek: model.seek, barHeight: 4, textSize: 9)
+          .frame(height: 16)
+        PlayerTransport(track: track, model: model, glyph: 15, buttonFrame: 28, spacing: 50)
+          .frame(height: 28)
+      } else {
+        Spacer(minLength: 0)
+        playButton(side: 30)
       }
+      PlayerVolumeSlider(model: volumeModel).padding(.top, 2)
     }
   }
 
   private var small: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack(alignment: .top, spacing: 0) {
-        artwork(side: 56)
+        artworkButton(side: 50)
         Spacer(minLength: 4)
         playButton(side: 30)
       }
       Spacer(minLength: 6)
-      Text(title).font(IslandFont.headline).foregroundStyle(IslandInk.primary).lineLimit(1)
-      Text(artist ?? String(localized: "Music"))
-        .font(IslandFont.label).foregroundStyle(IslandInk.secondary).lineLimit(1)
+      Button(action: model.openTrack) {
+        Text(title).font(IslandFont.headline).foregroundStyle(IslandInk.primary).lineLimit(1)
+      }.buttonStyle(.plain).disabled(model.track == nil)
+      Button(action: model.openArtist) {
+        Text(artist ?? String(localized: "Music"))
+          .font(IslandFont.label).foregroundStyle(IslandInk.secondary).lineLimit(1)
+      }.buttonStyle(.plain).disabled(artist == nil)
+      PlayerVolumeSlider(model: volumeModel).padding(.top, 2)
     }
   }
 
@@ -68,6 +75,13 @@ struct HomeIdlePlayerCard: View {
   static func cover(for model: NowPlayingModel) -> NSImage? {
     guard let track = model.track else { return nil }
     return track.artwork ?? model.lastArtwork
+  }
+
+  private func artworkButton(side: CGFloat) -> some View {
+    Button(action: model.openTrack) { artwork(side: side) }
+      .buttonStyle(IslandPressStyle(pressedScale: 0.97))
+      .disabled(model.track == nil || model.track?.isTransitioning == true)
+      .accessibilityLabel("Open current song")
   }
 
   private func artwork(side: CGFloat) -> some View {
@@ -102,15 +116,6 @@ struct HomeIdlePlayerCard: View {
     }
     .buttonStyle(IslandPressStyle(pressedScale: 0.88))
     .accessibilityLabel(playing ? "Pause" : "Play")
-  }
-
-  private func transportButton(_ symbol: String, label: LocalizedStringKey, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Image(systemName: symbol).font(.system(size: 13, weight: .bold)).foregroundStyle(IslandInk.secondary)
-        .frame(width: 30, height: 30).contentShape(Circle())
-    }
-    .buttonStyle(IslandPressStyle(pressedScale: 0.86))
-    .accessibilityLabel(label)
   }
 
   /// Like the Mac's play key: the system resumes whatever last played, in place. The button flips at

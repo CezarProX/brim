@@ -2760,3 +2760,9 @@
 "Signed updates come from Brim’s GitHub Releases. Install and relaunch from the island without downloading the app again. Background checks never install updates automatically." = "Signed updates come from Brim’s GitHub Releases. Install and relaunch from the island without downloading the app again. Background checks never install updates automatically.";
 
 "Install a release build of Brim to use signed updates." = "Install a release build of Brim to use signed updates.";
+
+"This audio output does not allow volume changes." = "This audio output does not allow volume changes.";
+
+"Open current song" = "Open current song";
+
+"Open artist" = "Open artist";

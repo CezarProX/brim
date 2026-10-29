@@ -2760,3 +2760,9 @@
 "Signed updates come from Brim’s GitHub Releases. Install and relaunch from the island without downloading the app again. Background checks never install updates automatically." = "Actualizările semnate provin din lansările Brim de pe GitHub. Instalează și repornește din insulă, fără să descarci din nou aplicația. Verificările din fundal nu instalează niciodată actualizări automat.";
 
 "Install a release build of Brim to use signed updates." = "Instalează o versiune publicată de Brim pentru actualizări semnate.";
+
+"This audio output does not allow volume changes." = "Această ieșire audio nu permite modificarea volumului.";
+
+"Open current song" = "Deschide piesa curentă";
+
+"Open artist" = "Deschide artistul";

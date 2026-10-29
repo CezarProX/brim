@@ -44,6 +44,34 @@ enum NowPlayingBrowser {
         return paused
     }
 
+    /// Selects the existing playing tab instead of opening a duplicate song in another tab.
+    static func focusPlayingTab(expected: NowPlayingSnapshot) throws -> Bool {
+        let bridge = try NowPlayingAppleEvents(source: expected.source)
+        let windows = try bridge.get(all("cwin"))
+        guard windows.numberOfItems > 0 else { return false }
+        for windowIndex in 1...min(windows.numberOfItems, 8) {
+            guard let window = windows.atIndex(windowIndex) else { continue }
+            let candidates = try bridge.get(all(expected.source == .youtubeChrome ? "CrTb" : "bTab", in: window))
+            guard candidates.numberOfItems > 0 else { continue }
+            for index in 1...min(candidates.numberOfItems, 200) {
+                guard let tab = candidates.atIndex(index) else { continue }
+                let property = NowPlayingAppleEvents.property(expected.source == .youtubeChrome ? "URL " : "pURL", of: tab)
+                guard let raw = try bridge.get(property).stringValue, URL(string: raw)?.host == "music.youtube.com",
+                      let snapshot = try NowPlayingSnapshot.browserJSON(execute(script(for: nil), tab: tab, bridge: bridge), source: expected.source),
+                      snapshot.title == expected.title, snapshot.artist == expected.artist else { continue }
+                _ = try bridge.send(eventClass: "core", eventID: "setd", parameters: [
+                    "----": NowPlayingAppleEvents.property(expected.source == .youtubeChrome ? "acTI" : "cTab", of: window),
+                    "data": expected.source == .youtubeChrome ? NSAppleEventDescriptor(int32: Int32(index)) : tab
+                ])
+                _ = try bridge.send(eventClass: "core", eventID: "setd", parameters: [
+                    "----": NowPlayingAppleEvents.property("pidx", of: window), "data": NSAppleEventDescriptor(int32: 1)
+                ])
+                return true
+            }
+        }
+        return false
+    }
+
     static func perform(_ command: NowPlayingCommand, expected: NowPlayingSnapshot, bridge: NowPlayingAppleEvents) throws {
         guard let active = try current(bridge) else { throw NowPlayingFailure.unavailable("Start a song in YouTube Music first.") }
         guard active.snapshot.title == expected.title, active.snapshot.artist == expected.artist else {
@@ -95,8 +123,19 @@ enum NowPlayingBrowser {
             const title = metadata?.title || bar.querySelector('.title')?.textContent?.trim() || '';
             if (!media || !title || media.ended || !media.currentSrc) return 'null';
             const image = metadata?.artwork?.[0]?.src || bar.querySelector('img')?.src || null;
+            const links = Array.from(bar.querySelectorAll('a[href]'));
+            const artistURL = links.map(a => a.href).find(h => {
+              try { const u = new URL(h); const p = u.pathname.split('/');
+                return u.origin === 'https://music.youtube.com' && ['channel', 'browse'].includes(p[1])
+                  && /^UC[A-Za-z0-9_-]{10,120}$/.test(p[2] || ''); } catch (_) { return false; }
+            }) || null;
+            const player = document.querySelector('ytmusic-player');
+            let videoID = null;
+            try { videoID = player?.getPlayerResponse?.()?.videoDetails?.videoId || null; } catch (_) {}
+            const pageURL = links.map(a => a.href).find(h => h.startsWith('https://music.youtube.com/watch?'))
+              || (videoID && /^[A-Za-z0-9_-]{11}$/.test(videoID) ? 'https://music.youtube.com/watch?v=' + videoID : location.href);
             return JSON.stringify({title, artist: metadata?.artist || bar.querySelector('.byline')?.textContent?.trim() || '',
-              album: metadata?.album || '', position: Number.isFinite(media.currentTime) ? media.currentTime : 0,
+              pageURL, artistURL, album: metadata?.album || '', position: Number.isFinite(media.currentTime) ? media.currentTime : 0,
               duration: Number.isFinite(media.duration) ? media.duration : 0, isPlaying: !media.paused, artworkURL: image});
             """
         }

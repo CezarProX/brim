@@ -69,7 +69,10 @@ extension MediaRemoteStreamMessage.Payload {
             position: elapsed, isPlaying: isPlaying, artworkData: artwork,
             isFavorite: sameSong ? previous?.isFavorite : nil, isShuffling: sameSong ? previous?.isShuffling : nil)
         snapshot.playbackRate = rate
-        if sameSong { snapshot.pageURL = previous?.pageURL }
+        if sameSong {
+            snapshot.pageURL = previous?.pageURL
+            snapshot.artistURL = previous?.artistURL
+        }
         return snapshot
     }
 }

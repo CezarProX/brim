@@ -12,6 +12,7 @@ struct MusicPlayerCard: View {
     @ObservedObject var lyrics: LyricsModel = .shared
     /// Clearance above the content: the hardware notch on notched Macs, a small margin otherwise.
     var topInset: CGFloat = 45
+    var volumeModel: PlayerVolumeModel?
     /// Whether the Playing Next column is open; nil keeps it in local state (open by default).
     var showsQueue: Binding<Bool>?
     @State private var localShowsQueue = true
@@ -94,6 +95,7 @@ struct MusicPlayerCard: View {
             PlayerScrubber(track: track, seek: model.seek)
                 .padding(.top, 6)
             controls(track).padding(.top, 0)
+            PlayerVolumeSlider(model: volumeModel).padding(.top, 2)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Self.sideInset)
@@ -103,16 +105,22 @@ struct MusicPlayerCard: View {
 
     private func header(_ track: NowPlayingTrack) -> some View {
         HStack(alignment: .top, spacing: 14) {
-            PlayerArtwork(track: track, cornerRadius: 12.5, drift: false).frame(width: Self.artSize, height: Self.artSize)
-            PlayerTitleBlock(track: track)
+            Button(action: model.openTrack) {
+                PlayerArtwork(track: track, cornerRadius: 12.5, drift: false)
+                    .frame(width: Self.artSize, height: Self.artSize)
+            }
+            .buttonStyle(IslandPressStyle(pressedScale: 0.97))
+            .accessibilityLabel("Open current song")
+            .disabled(track.isTransitioning)
+            PlayerTitleBlock(track: track, onOpenTrack: model.openTrack, onOpenArtist: model.openArtist)
                 .frame(height: Self.artSize, alignment: .center)
-                .popOutHandle()
             VStack(alignment: .trailing, spacing: 6) {
                 AutomixWaveformSlot(track: track, tint: ArtworkTint.color(for: track.artwork))
                     .frame(width: 23, height: 16)
                 if let quality = qualityModel.quality { AudioQualityBadge(quality: quality) }
             }
             .padding(.top, 16)
+            .popOutHandle()
         }
         .frame(height: Self.artSize)
     }

@@ -318,6 +318,7 @@ enum NowPlayingAccessibility {
                 .flatMap(YouTubeThumbnail.artworkURL(videoID:)),
             albumURL: album?.url)
         snapshot.pageURL = pageURL.flatMap(NowPlayingResume.sanitizedPage)
+        snapshot.artistURL = nodes.compactMap { NowPlayingNavigation.safeArtistURL($0.url, source: .youtubeApp)?.absoluteString }.first
         return snapshot
     }
 
@@ -349,7 +350,34 @@ enum NowPlayingAccessibility {
             isPlaying: nodes.contains { matches($0, pause) },
             artworkURL: pageURL.flatMap(YouTubeThumbnail.videoID(from:)).flatMap(YouTubeThumbnail.artworkURL(videoID:)))
         snapshot.pageURL = pageURL.flatMap(NowPlayingResume.sanitizedPage)
+        snapshot.artistURL = nodes.compactMap { NowPlayingNavigation.safeArtistURL($0.url, source: .youtubeApp)?.absoluteString }.first
         return snapshot
+    }
+
+    /// User-initiated navigation for redesigned player bars that expose an artist button but no URL.
+    /// Revalidate the playing song immediately before pressing, and never search outside its player bar.
+    static func pressArtist(expected: NowPlayingSnapshot) throws -> Bool {
+        let player = try readPlayer(requireComplete: true)
+        let texts = player.nodes.map(\.text)
+        guard let current = snapshot(from: texts, pageURL: player.pageURL),
+              current.title == expected.title, current.artist == expected.artist,
+              let index = artistNavigationIndex(in: texts) else { return false }
+        return AXUIElementPerformAction(player.nodes[index].element, kAXPressAction as CFString) == .success
+    }
+
+    static func artistNavigationIndex(in nodes: [PlayerText]) -> Int? {
+        if let index = nodes.firstIndex(where: { NowPlayingNavigation.safeArtistURL($0.url, source: .youtubeApp) != nil }) {
+            return index
+        }
+        guard let start = nodes.firstIndex(where: { $0.role == kAXGroupRole && $0.label == "Now playing" }),
+              let title = nodes[(start + 1)...].firstIndex(where: { $0.role == kAXStaticTextRole && !$0.label.isEmpty })
+        else { return nil }
+        for index in nodes.indices where index > title {
+            let node = nodes[index]
+            if node.label == "PLAYBACK_CONTROLS" || (node.role == kAXStaticTextRole && node.label.contains("•")) { break }
+            if (node.role == kAXButtonRole || node.role == "AXLink"), !node.label.isEmpty { return index }
+        }
+        return nil
     }
 
     static func parseTiming(_ value: String) -> (position: TimeInterval, duration: TimeInterval) {
