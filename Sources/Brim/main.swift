@@ -57,6 +57,36 @@ MainActor.assumeIsolated {
         app.run()
         exit(0)
     }
+    if CommandLine.arguments.contains("--queue-probe") {
+        // Read-only apart from opening (then closing) one row's menu: the Play next path, step by step.
+        app.setActivationPolicy(.accessory)
+        Task {
+            var lines: [String] = []
+            let model = NowPlayingModel()
+            model.start()
+            try? await Task.sleep(for: .seconds(6))
+            if let track = model.track {
+                let snapshot = track.snapshot
+                lines.append("Track: source=\(snapshot.source.rawValue) title=\(snapshot.title)")
+                do {
+                    let items = try await YouTubeMusicQueueReader.upcoming(after: snapshot, limit: 12)
+                    lines.append("Upcoming: " + items.prefix(4).map(\.title).joined(separator: " | "))
+                    if let item = items.dropFirst().first {
+                        let opened = try await YouTubeMusicQueueReader.runInTabs(
+                            for: snapshot.source, javaScript: try YouTubeMusicQueueReader.openMenuScript(title: item.title, current: snapshot.title))
+                        lines.append("Open menu for \(item.title): \(YouTubeMusicQueueReader.statuses(opened))")
+                        _ = try? await YouTubeMusicQueueReader.runInTabs(for: snapshot.source, javaScript:
+                            "(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 'closed'; })()")
+                    }
+                } catch { lines.append("Failed: \(error.localizedDescription)") }
+            } else { lines.append("No track") }
+            model.stop()
+            try? lines.joined(separator: "\n").write(to: URL(fileURLWithPath: "/tmp/Brim-queue-probe.txt"), atomically: true, encoding: .utf8)
+            app.terminate(nil)
+        }
+        app.run()
+        exit(0)
+    }
     if CommandLine.arguments.contains("--music-diagnostic") {
         app.setActivationPolicy(.accessory)
         Task {

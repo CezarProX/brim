@@ -183,6 +183,24 @@ struct YouTubeMusicBrowserQueueTests {
     #expect(rows[0].pressIndex == 3)
   }
 
+  /// Two YouTube Music windows: a paused one whose queue also lists the playing song further down,
+  /// and the one really playing it. The list must come from the second; the first one's songs made
+  /// Play next answer "missing" in the playing window and the queue snap back (seen live).
+  @Test func readsTheWindowWhoseSelectedRowIsThePlayingSong() {
+    let paused = """
+      [{"t":"Chicago","a":"Michael Jackson","d":"4:05","i":"","s":true},
+       {"t":"Low Life","a":"Future","d":"5:13","i":"","s":false},
+       {"t":"Next","a":"The Weeknd","d":"3:57","i":"","s":false}]
+      """.replacingOccurrences(of: "\n", with: "")
+    let playing = """
+      [{"t":"Down On Me","a":"Jeremih","d":"3:48","i":"","s":false},
+       {"t":"Next","a":"The Weeknd","d":"3:57","i":"","s":true},
+       {"t":"Summer Love","a":"Justin Timberlake","d":"4:12","i":"","s":false}]
+      """.replacingOccurrences(of: "\n", with: "")
+    let rows = YouTubeQueueParsing.browserUpcoming(paused + "\n" + playing, title: "Next", artist: "The Weeknd", limit: 12)
+    #expect(rows.map(\.title) == ["Summer Love"])
+  }
+
   @Test func aClosedQueueTakesCoversFromTheSameSongsOnThePage() {
     let lazy = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP"
     let page = """

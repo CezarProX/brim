@@ -15,17 +15,24 @@ extension YouTubeMusicQueueReader {
         let opened = try await runInTabs(
             for: snapshot.source, javaScript: try openMenuScript(title: item.title, current: snapshot.title))
         guard lines(opened).contains("opened") else {
-            throw NowPlayingFailure.unavailable("The queued song is no longer listed.")
+            throw NowPlayingFailure.unavailable("The queued song is no longer listed (\(statuses(opened))).")
         }
         try await Task.sleep(for: menuSettle)
         let chosen = try await runInTabs(
             for: snapshot.source, javaScript: try choosePlayNextScript(current: snapshot.title))
         guard lines(chosen).contains("ok") else {
-            throw NowPlayingFailure.unavailable("YouTube Music did not offer Play next for this song.")
+            throw NowPlayingFailure.unavailable("YouTube Music did not offer Play next for this song (\(statuses(chosen))).")
         }
     }
 
     private static func lines(_ output: String) -> [Substring] { output.split(whereSeparator: \.isNewline) }
+
+    /// The scripts' own status words per tab (never page text), so a failure says which check refused.
+    static func statuses(_ output: String) -> String {
+        let known: Set<Substring> = ["opened", "ok", "other", "missing", "nomenu", "noitem", "null", "unavailable"]
+        let words = lines(output).map { known.contains($0) ? String($0) : "?" }
+        return words.isEmpty ? "no YouTube Music tab answered" : words.joined(separator: ",")
+    }
 
     /// Page data reaches the scripts only as base64 JSON, so titles never break out of the string.
     private static func payload(_ values: [String: String]) throws -> String {

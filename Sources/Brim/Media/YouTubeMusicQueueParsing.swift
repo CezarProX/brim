@@ -264,12 +264,18 @@ enum YouTubeQueueParsing {
         return rows
     }
 
-    /// The upcoming songs from the first tab (one JSON line each) where the playing song is found.
+    /// The upcoming songs from the tab (one JSON line each) playing the current song. With several
+    /// YouTube Music windows, a tab whose selected row is another song is skipped even when its list
+    /// holds the current song further down; a tab with no selected row matches by title.
     static func browserUpcoming(_ output: String, title: String, artist: String, limit: Int) -> [YouTubeQueueRow] {
-        for line in output.split(whereSeparator: \.isNewline) {
-            if let next = after(current: title, artist: artist, in: browserRows(String(line))) {
-                return Array(next.prefix(limit))
+        let tabs = output.split(whereSeparator: \.isNewline).map { browserRows(String($0)) }
+        for rows in tabs {
+            if let index = rows.firstIndex(where: \.isPlaying), sameSong(rows[index], title: title, artist: artist) {
+                return Array(rows[(index + 1)...].prefix(limit))
             }
+        }
+        for rows in tabs where !rows.contains(where: \.isPlaying) {
+            if let next = after(current: title, artist: artist, in: rows) { return Array(next.prefix(limit)) }
         }
         return []
     }

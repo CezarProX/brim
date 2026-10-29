@@ -23,9 +23,13 @@ enum YouTubeMusicQueueReader {
         case .youtubeApp:
             // The app is a Chrome app window: page scripting reads its real queue. Without it (Chrome's
             // "Allow JavaScript from Apple Events" off) the list comes from the accessibility tree.
-            if let output = try? await runInTabs(for: snapshot.source, javaScript: browserReadScript) {
+            do {
+                let output = try await runInTabs(for: snapshot.source, javaScript: browserReadScript)
                 let rows = YouTubeQueueParsing.browserUpcoming(output, title: snapshot.title, artist: snapshot.artist, limit: limit)
                 if !rows.isEmpty { return YouTubeQueueParsing.items(rows) }
+                log.notice("YouTube Music page queue had no rows after the playing song; reading accessibility")
+            } catch {
+                log.notice("YouTube Music page queue unreadable (\(error.localizedDescription, privacy: .public)); reading accessibility")
             }
             let rows = try await onQueue {
                 let page = try capture()
